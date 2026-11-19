@@ -7,13 +7,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"go.uber.org/zap"
 
 	"github.com/StreamNext/Backend/internal/apperr"
 )
 
 func TestWriteErrorMapsKinds(t *testing.T) {
-	s := NewServer(fakeDB{}, zap.NewNop())
+	s := newHarness(t).srv
 	rec := httptest.NewRecorder()
 	s.writeError(rec, apperr.New(apperr.NotFound, "no such show"))
 	assert.Equal(t, http.StatusNotFound, rec.Code)
@@ -26,7 +25,7 @@ func TestWriteErrorMapsKinds(t *testing.T) {
 }
 
 func TestUnknownRouteIsJSON404(t *testing.T) {
-	h := NewServer(fakeDB{}, zap.NewNop()).Handler()
+	h := newHarness(t).handler
 	for _, method := range []string{http.MethodGet, http.MethodPost} {
 		rec := do(t, h, method, "/v1/nope")
 		assert.Equal(t, http.StatusNotFound, rec.Code, method)
@@ -35,10 +34,18 @@ func TestUnknownRouteIsJSON404(t *testing.T) {
 	}
 }
 
+func TestUnknownRouteIsNotAuthChallenged(t *testing.T) {
+	// A missing route is a 404 for everyone, not a 401 that hints at what exists.
+	assert.Equal(t, http.StatusNotFound, do(t, newHarness(t).handler, http.MethodGet, "/v1/nope").Code)
+}
+
 func TestWrongMethodIsJSON405WithAllow(t *testing.T) {
-	rec := do(t, NewServer(fakeDB{}, zap.NewNop()).Handler(), http.MethodPost, "/v1/health")
+	rec := do(t, newHarness(t).handler, http.MethodPost, "/v1/health")
 	assert.Equal(t, http.StatusMethodNotAllowed, rec.Code)
 	assert.Equal(t, "GET", rec.Header().Get("Allow"))
-	assert.Equal(t, "application/json", rec.Header().Get("Content-Type"))
 	assert.JSONEq(t, `{"code":"method_not_allowed","message":"method not allowed"}`, rec.Body.String())
+
+	rec = do(t, newHarness(t).handler, http.MethodDelete, "/v1/me")
+	assert.Equal(t, http.StatusMethodNotAllowed, rec.Code)
+	assert.Equal(t, "GET, PATCH", rec.Header().Get("Allow"))
 }

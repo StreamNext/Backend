@@ -9,12 +9,12 @@ import (
 )
 
 func main() {
-	cfg, err := config.Load()
+	dbURL, err := config.DatabaseURL()
 	if err != nil {
 		log.Fatal(err)
 	}
 	ctx := context.Background()
-	pool, err := db.Connect(ctx, cfg.DatabaseURL, "streamnext-migrate")
+	pool, err := db.Connect(ctx, dbURL, "streamnext-migrate")
 	if err != nil {
 		log.Fatal(err)
 	}

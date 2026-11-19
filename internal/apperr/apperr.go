@@ -17,6 +17,7 @@ const (
 	Unauthenticated
 	Unavailable
 	MethodNotAllowed
+	TooManyRequests
 )
 
 // Error carries a Kind and a client-safe message.
@@ -56,6 +57,8 @@ func (k Kind) Status() int {
 		return http.StatusServiceUnavailable
 	case MethodNotAllowed:
 		return http.StatusMethodNotAllowed
+	case TooManyRequests:
+		return http.StatusTooManyRequests
 	default:
 		return http.StatusInternalServerError
 	}
@@ -78,6 +81,8 @@ func (k Kind) Code() string {
 		return "unavailable"
 	case MethodNotAllowed:
 		return "method_not_allowed"
+	case TooManyRequests:
+		return "rate_limited"
 	default:
 		return "internal"
 	}

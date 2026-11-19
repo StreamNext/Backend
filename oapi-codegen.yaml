@@ -2,4 +2,5 @@ package: api
 generate:
   std-http-server: true
   models: true
+  embedded-spec: true # the server reads which operations need a bearer token from the contract
 output: gen/api/api.gen.go

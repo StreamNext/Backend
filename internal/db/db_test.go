@@ -9,30 +9,22 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/testcontainers/testcontainers-go"
-	"github.com/testcontainers/testcontainers-go/modules/postgres"
-	"github.com/testcontainers/testcontainers-go/wait"
+
+	"github.com/StreamNext/Backend/internal/testdb"
 )
 
 var testURL string
 
-// TestMain starts one throwaway Postgres 16 (same engine as prod) shared by all tests in the package.
+// TestMain starts one throwaway Postgres shared by all tests in the package.
 func TestMain(m *testing.M) {
-	ctx := context.Background()
-	c, err := postgres.Run(ctx, "postgres:16-alpine",
-		postgres.WithDatabase("streamnext"), postgres.WithUsername("u"), postgres.WithPassword("p"),
-		testcontainers.WithWaitStrategy(wait.ForLog("database system is ready to accept connections").WithOccurrence(2).WithStartupTimeout(60*time.Second)),
-	)
+	url, stop, err := testdb.Start(context.Background())
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "start postgres (is Docker running?):", err)
-		os.Exit(1)
-	}
-	if testURL, err = c.ConnectionString(ctx, "sslmode=disable"); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+	testURL = url
 	code := m.Run()
-	_ = testcontainers.TerminateContainer(c)
+	stop()
 	os.Exit(code)
 }
 

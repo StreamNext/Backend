@@ -1,0 +1,23 @@
+meta {
+  name: Reuse revoked the current token too
+  type: http
+  seq: 13
+}
+
+post {
+  url: {{baseUrl}}/v1/auth/refresh
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "refreshToken": "{{refreshToken}}",
+    "deviceId": "{{deviceId}}"
+  }
+}
+
+assert {
+  res.status: eq 401
+  res.body.code: eq unauthenticated
+}

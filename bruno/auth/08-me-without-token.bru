@@ -1,0 +1,16 @@
+meta {
+  name: Get my profile without a token
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/v1/me
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 401
+  res.body.code: eq unauthenticated
+}

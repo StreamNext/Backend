@@ -1,0 +1,33 @@
+meta {
+  name: Refresh (rotates the token)
+  type: http
+  seq: 11
+}
+
+post {
+  url: {{baseUrl}}/v1/auth/refresh
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "refreshToken": "{{refreshToken}}",
+    "deviceId": "{{deviceId}}"
+  }
+}
+
+script:pre-request {
+  bru.setVar("oldRefreshToken", bru.getVar("refreshToken"));
+}
+
+vars:post-response {
+  accessToken: res.body.accessToken
+  refreshToken: res.body.refreshToken
+}
+
+assert {
+  res.status: eq 200
+  res.body.refreshToken: neq {{oldRefreshToken}}
+  res.body.user.email: eq {{email}}
+}

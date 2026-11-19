@@ -1,0 +1,29 @@
+meta {
+  name: Login again after the reuse
+  type: http
+  seq: 14
+}
+
+post {
+  url: {{baseUrl}}/v1/auth/login
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "{{email}}",
+    "password": "correct-horse-battery",
+    "deviceId": "{{deviceId}}"
+  }
+}
+
+vars:post-response {
+  accessToken: res.body.accessToken
+  refreshToken: res.body.refreshToken
+}
+
+assert {
+  res.status: eq 200
+  res.body.accessToken: isString
+}

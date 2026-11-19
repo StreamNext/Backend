@@ -1,0 +1,26 @@
+meta {
+  name: Update my profile with an unknown timezone
+  type: http
+  seq: 10
+}
+
+patch {
+  url: {{baseUrl}}/v1/me
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "timezone": "Mars/Olympus"
+  }
+}
+
+assert {
+  res.status: eq 400
+  res.body.code: eq invalid_argument
+}

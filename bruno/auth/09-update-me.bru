@@ -1,0 +1,28 @@
+meta {
+  name: Update my profile
+  type: http
+  seq: 9
+}
+
+patch {
+  url: {{baseUrl}}/v1/me
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "displayName": "Bruno",
+    "timezone": "America/Bogota"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.displayName: eq Bruno
+  res.body.timezone: eq America/Bogota
+}

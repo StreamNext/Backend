@@ -24,7 +24,7 @@ jobs:
         with: { repository: StreamNext/Proto, path: Proto }
       - uses: actions/setup-go@v5
         with: { go-version-file: Backend/go.mod }
-      - run: make generate
+      - run: make generate-api
       - uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}

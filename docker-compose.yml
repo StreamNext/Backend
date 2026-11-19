@@ -11,11 +11,14 @@ services:
   migrate:
     build: .
     entrypoint: ["/app/migrate"]
-    environment: &env
-      DATABASE_URL: postgres://u:p@db:5432/streamnext?sslmode=disable
+    environment:
+      DATABASE_URL: &dburl postgres://u:p@db:5432/streamnext?sslmode=disable
     depends_on: { db: { condition: service_healthy } }
   api:
     build: .
-    environment: *env
+    environment:
+      DATABASE_URL: *dburl
+      JWT_SECRET: bruno-and-ci-only-secret-never-used-for-real-0123456789
+      REFRESH_GRACE_SECONDS: "0" # makes refresh-token reuse detection immediate, so Bruno can assert it
     ports: ["8080:8080"]
     depends_on: { migrate: { condition: service_completed_successfully } }

@@ -3,17 +3,23 @@
 Go REST + JWT API for StreamNext. Read `../CLAUDE.md` and `../docs/specs/02-architecture.md` first. Contract: `../Proto/openapi/v1/streamnext.yaml` (hand-written).
 
 ## Layout
-`cmd/{server,migrate}` · `internal/{apperr,config,db,rest,version}` · `gen/` (gitignored, from `make generate`) · `bruno/` · `internal/db/{migrations,query}`
+`cmd/{server,migrate}` · `internal/{apperr,auth,config,db,repository,rest,service,sqlc,testdb,version}` · `gen/api` (gitignored, from the contract) · `internal/sqlc` (generated, **committed**) · `bruno/` · `internal/db/{migrations,query}`
+
+Flow: `rest` (HTTP) → `service` (rules, depends only on interfaces in `service/repositories.go`) → `repository` (sqlc + pgx). `auth` is pure crypto (argon2id, JWT, refresh tokens).
 
 ## Commands
 | | |
 |---|---|
-| `make generate` | oapi-codegen from `../Proto` into `gen/api` (run after any contract change and on a fresh clone) |
-| `make test` | vet + unit + testcontainers tests (needs Docker) + **90% coverage gate** on `internal/` |
+| `make generate-api` | oapi-codegen from `../Proto` into `gen/api` (after any contract change and on a fresh clone) |
+| `make generate-sql` | `sqlc generate` into `internal/sqlc` (after any migration or query change; needs `brew install sqlc`); commit the output |
+| `make test` | vet + unit + testcontainers tests (needs Docker) + **90% coverage gate** on `internal/` (generated `sqlc` and the `testdb` helper excluded) |
 | `make bruno` | Postgres + migrate + API in Docker, then `bru run --env ci` |
 | `make db-up` / `db-down` | start/stop the standalone dev database (run on the DB host) |
 | `make run` / `make migrate` | run against `ENV=dev` secrets (sops); needs the dev database up |
 | `make secrets-decrypt` / `secrets-encrypt` | edit `<env>.env` (gitignored), re-encrypt to `<env>.enc.env` |
+
+## Config (env)
+`DATABASE_URL`, `JWT_SECRET` (at least 32 bytes) are required; `PORT` (default 8080) and `REFRESH_GRACE_SECONDS` (default 10; compose sets 0 so Bruno can assert reuse detection) are optional. `cmd/migrate` needs only `DATABASE_URL`.
 
 ## Dev database
 `docker-compose.db.yml` defines a standalone StreamNext Postgres 16 (user `streamnext`, db `streamnext_dev`, port **5433**, own volume), separate from WellSpent's. Start it once on the DB host with `make db-up` (or copy `.env.db.example` to `.env.db`) and leave it running; every machine's `dev.enc.env` points `DATABASE_URL` at that host. Recreate from scratch: `docker compose -f docker-compose.db.yml --env-file .env.db down -v`, then `make db-up` and `make migrate`. On a Windows DB host you don't need sops: copy `.env.db` (from `make db-env` on the Mac), run the compose command from `docker-compose.db.yml`'s header, and open the port once with `scripts/open-db-firewall.ps1` (elevated PowerShell). Tests never use it: `make test` and `make bruno` start their own throwaway containers.
@@ -22,9 +28,10 @@ Go REST + JWT API for StreamNext. Read `../CLAUDE.md` and `../docs/specs/02-arch
 Encrypted files are `dev.enc.env` / `prod.enc.env` (the `.env` suffix is needed for sops to detect the format). The StreamNext age key is `~/Library/Application Support/sops/age/streamnext.txt` — **not** WellSpent's `keys.txt`. The Makefile points sops at it automatically (override with `AGE_KEY_FILE=...`). When you run `sops` directly, export `SOPS_AGE_KEY_FILE` to that path first, otherwise sops tries WellSpent's `keys.txt` and fails with "no master key was able to decrypt". CI uses the `SOPS_AGE_KEY` secret.
 
 ## Layer order for a feature
-Contract (Proto) → `make generate` → migration + sqlc query → repository (interface) → service (unit tests with mocked repos) → REST handler (httptest) → Bruno requests. `sqlc.yaml` is configured but `sqlc generate` needs at least one query; add it with the first real query (M1) and wire it into `make generate`.
+Contract (Proto) → `make generate` → migration + sqlc query → repository (interface) → service (unit tests with mocked repos) → REST handler (httptest) → Bruno requests. Queries live in `internal/db/query/*.sql`; `sqlc generate` reads the goose migrations as the schema, so a migration change means re-running `make generate-sql` (CI fails on a stale `internal/sqlc`).
 
 ## Rules
+- Auth: mark an operation's `security` in the OpenAPI contract and the bearer check applies automatically (`internal/rest/authmw.go` reads the embedded spec); `userID(ctx)` then gives the caller. Never take a user id from the request body or URL for "me" operations.
 - Errors: return `*apperr.Error`; `rest.writeError` is the only place that maps them to HTTP. Untyped errors become a generic 500 — never leak internals.
 - Every process sets its own `application_name`. Neon: **direct** URL, not the pooler.
 - Log with IDs via zap; never swallow an error.
