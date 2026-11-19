@@ -23,10 +23,18 @@ func (s *Server) UpdateMe(w http.ResponseWriter, r *http.Request) {
 	if !s.decode(w, r, &req) {
 		return
 	}
-	u, err := s.profile.Update(r.Context(), userID(r.Context()), service.UpdateProfileInput{DisplayName: req.DisplayName, Timezone: req.Timezone})
+	u, err := s.profile.Update(r.Context(), userID(r.Context()), service.UpdateProfileInput{DisplayName: req.DisplayName, Timezone: req.Timezone, Language: languageString(req.Language)})
 	if err != nil {
 		s.writeError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, toAPIUser(u))
+}
+
+func languageString(l *api.Language) *string {
+	if l == nil {
+		return nil
+	}
+	s := string(*l)
+	return &s
 }

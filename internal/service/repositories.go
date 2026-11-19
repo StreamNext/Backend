@@ -22,6 +22,7 @@ type User struct {
 	EmailVerifiedAt *time.Time
 	DisplayName     string
 	Timezone        string
+	Language        Language // en or es
 }
 
 type RefreshToken struct {
@@ -59,7 +60,7 @@ type UserRepository interface {
 	GetByEmail(ctx context.Context, email string) (User, error) // ErrNotFound
 	GetByID(ctx context.Context, id uuid.UUID) (User, error)    // ErrNotFound
 	// UpdateProfile changes only the non-nil fields.
-	UpdateProfile(ctx context.Context, id uuid.UUID, displayName, timezone *string, now time.Time) (User, error)
+	UpdateProfile(ctx context.Context, id uuid.UUID, displayName, timezone, language *string, now time.Time) (User, error)
 	SetPassword(ctx context.Context, id uuid.UUID, passwordHash string, now time.Time) error // ErrNotFound
 	// ClearPassword leaves the account without a password, so it can only be entered via a provider
 	// or after a password reset.

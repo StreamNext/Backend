@@ -1,0 +1,26 @@
+meta {
+  name: An unknown language is a 400
+  type: http
+  seq: 14
+}
+
+patch {
+  url: {{baseUrl}}/v1/me
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "language": "fr"
+  }
+}
+
+assert {
+  res.status: eq 400
+  res.body.code: eq invalid_argument
+}

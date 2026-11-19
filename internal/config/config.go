@@ -24,6 +24,13 @@ type Config struct {
 	AppBaseURL string // where email links point (the Web repo's pages), no trailing slash
 	Mail       MailConfig
 	Social     SocialConfig
+	TVDB       TVDBConfig
+}
+
+// TVDBConfig says how to reach TheTVDB. With no key the catalog is disabled and its endpoints answer 503.
+type TVDBConfig struct {
+	APIKey  string
+	BaseURL string // optional: tests and the CI stub point it elsewhere
 }
 
 // SocialConfig lists the client ids ID tokens must be issued for. A provider with none is disabled
@@ -48,6 +55,19 @@ func DatabaseURL() (string, error) {
 	return u, nil
 }
 
+// TVDBFromEnv reads TVDB_API_KEY and the optional TVDB_BASE_URL. The tvdb-sync job needs only these and
+// DatabaseURL, so it does not go through Load.
+func TVDBFromEnv() (TVDBConfig, error) {
+	c := TVDBConfig{APIKey: strings.TrimSpace(os.Getenv("TVDB_API_KEY")), BaseURL: strings.TrimSpace(os.Getenv("TVDB_BASE_URL"))}
+	if c.BaseURL != "" {
+		u, err := url.Parse(c.BaseURL)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+			return TVDBConfig{}, errors.New("config: TVDB_BASE_URL must be an absolute http(s) URL")
+		}
+	}
+	return c, nil
+}
+
 // Load fails fast when a required variable is missing or invalid.
 func Load() (Config, error) {
 	dbURL, err := DatabaseURL()
@@ -59,6 +79,9 @@ func Load() (Config, error) {
 		Env: env("ENV", "dev"), AppBaseURL: env("APP_BASE_URL", "http://localhost:3000"),
 		Mail:   MailConfig{Provider: env("MAIL_PROVIDER", "log"), From: os.Getenv("MAIL_FROM"), ResendAPIKey: os.Getenv("RESEND_API_KEY")},
 		Social: SocialConfig{AppleClientID: strings.TrimSpace(os.Getenv("APPLE_CLIENT_ID")), GoogleClientIDs: splitList(os.Getenv("GOOGLE_CLIENT_IDS"))},
+	}
+	if c.TVDB, err = TVDBFromEnv(); err != nil {
+		return Config{}, err
 	}
 	if len(c.JWTSecret) < minJWTSecretLen {
 		return Config{}, fmt.Errorf("config: JWT_SECRET is required and must be at least %d bytes", minJWTSecretLen)

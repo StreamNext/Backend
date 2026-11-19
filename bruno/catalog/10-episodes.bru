@@ -1,0 +1,23 @@
+meta {
+  name: List a season's episodes
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/v1/series/327417/episodes?season=1
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.episodes[0].seasonNumber: eq 1
+  res.body.episodes[0].number: eq 1
+  res.body.episodes[0].name: eq Do as Planned
+  res.body.episodes[0].aired: eq 2017-05-02
+}

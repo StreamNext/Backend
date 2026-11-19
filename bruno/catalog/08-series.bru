@@ -1,0 +1,28 @@
+meta {
+  name: Open a series (first request fetches and stores it)
+  type: http
+  seq: 8
+}
+
+get {
+  url: {{baseUrl}}/v1/series/327417
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.name: eq Money Heist
+  res.body.originalName: eq La casa de papel
+  res.body.status: eq ended
+  res.body.network: eq Netflix
+  res.body.originalLanguage: eq spa
+  res.body.genres[0].name: eq Drama
+  res.body.genres[1].name: eq Crime
+  res.body.seasons.length: gt 0
+  res.body.syncedAt: isString
+}

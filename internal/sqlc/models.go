@@ -31,6 +31,33 @@ type EmailToken struct {
 	ConsumedAt *time.Time
 }
 
+type Episode struct {
+	ID               int64
+	SeriesID         int64
+	SeasonNumber     int32
+	Number           int32
+	AbsoluteNumber   int32
+	OriginalName     string
+	OriginalOverview string
+	Aired            *time.Time
+	Runtime          int32
+	Image            string
+	FinaleType       string
+}
+
+type EpisodeTranslation struct {
+	EpisodeID int64
+	Language  string
+	Name      string
+	Overview  string
+}
+
+type Genre struct {
+	ID   int64
+	Name string
+	Slug string
+}
+
 type OauthAccount struct {
 	ID        uuid.UUID
 	UserID    uuid.UUID
@@ -52,6 +79,52 @@ type RefreshToken struct {
 	ReplacedBy      *uuid.UUID
 }
 
+type Season struct {
+	ID       int64
+	SeriesID int64
+	Number   int32
+	Name     string
+	Image    string
+}
+
+type Series struct {
+	ID               int64
+	Slug             string
+	OriginalName     string
+	OriginalOverview string
+	OriginalLanguage string
+	OriginalCountry  string
+	Image            string
+	Status           string
+	FirstAired       *time.Time
+	LastAired        *time.Time
+	NextAired        *time.Time
+	AirsTime         string
+	AirsDays         []string
+	Network          string
+	AverageRuntime   int32
+	TvdbUpdatedAt    *time.Time
+	SyncedAt         time.Time
+}
+
+type SeriesGenre struct {
+	SeriesID int64
+	GenreID  int64
+}
+
+type SeriesTranslation struct {
+	SeriesID int64
+	Language string
+	Name     string
+	Overview string
+}
+
+type SyncState struct {
+	Key       string
+	Value     string
+	UpdatedAt time.Time
+}
+
 type User struct {
 	ID              uuid.UUID
 	Email           string
@@ -61,4 +134,5 @@ type User struct {
 	Timezone        string
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
+	Language        string
 }

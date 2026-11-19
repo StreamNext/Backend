@@ -1,0 +1,20 @@
+meta {
+  name: Episodes in Spanish
+  type: http
+  seq: 16
+}
+
+get {
+  url: {{baseUrl}}/v1/series/327417/episodes?season=1
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.episodes[0].name: eq Efectuar lo acordado
+}

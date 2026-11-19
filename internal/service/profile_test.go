@@ -85,3 +85,23 @@ func TestProfileUpdateErrors(t *testing.T) {
 	_, err = svc.Update(context.Background(), u.ID, UpdateProfileInput{DisplayName: str("x")})
 	requireKind(t, err, apperr.Internal)
 }
+
+func TestProfileLanguage(t *testing.T) {
+	svc, users, u := profileEnv(t)
+	ctx := context.Background()
+
+	got, err := svc.Update(ctx, u.ID, UpdateProfileInput{Language: str("es")})
+	require.NoError(t, err)
+	assert.Equal(t, LanguageSpanish, got.Language)
+	assert.Equal(t, "Ana", got.DisplayName, "only the language changed")
+	assert.Equal(t, LanguageSpanish, users.byID[u.ID].Language)
+
+	got, err = svc.Update(ctx, u.ID, UpdateProfileInput{Language: str("en")})
+	require.NoError(t, err)
+	assert.Equal(t, LanguageEnglish, got.Language)
+
+	for _, bad := range []string{"fr", "", "EN", "eng"} {
+		_, err := svc.Update(ctx, u.ID, UpdateProfileInput{Language: str(bad)})
+		requireKind(t, err, apperr.InvalidArgument, bad)
+	}
+}

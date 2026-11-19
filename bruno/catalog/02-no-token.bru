@@ -1,0 +1,16 @@
+meta {
+  name: The catalog needs a sign-in
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/v1/series/327417
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 401
+  res.body.code: eq unauthenticated
+}

@@ -14,6 +14,9 @@ services:
     environment:
       DATABASE_URL: &dburl postgres://u:p@db:5432/streamnext?sslmode=disable
     depends_on: { db: { condition: service_healthy } }
+  tvdb: # a stand-in for TheTVDB that replays recorded fixtures, so the catalog runs with no API key
+    build: .
+    entrypoint: ["/app/tvdbstub"]
   api:
     build: .
     environment:
@@ -23,5 +26,7 @@ services:
       # Providers are enabled (so garbage tokens are a 401, not a 503) but no real token can pass.
       APPLE_CLIENT_ID: ci.example.app
       GOOGLE_CLIENT_IDS: ci-google-client.apps.googleusercontent.com
+      TVDB_API_KEY: stub-key
+      TVDB_BASE_URL: http://tvdb:8081/v4
     ports: ["8080:8080"]
-    depends_on: { migrate: { condition: service_completed_successfully } }
+    depends_on: { migrate: { condition: service_completed_successfully }, tvdb: { condition: service_started } }

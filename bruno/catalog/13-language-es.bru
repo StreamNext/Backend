@@ -1,0 +1,26 @@
+meta {
+  name: Switch the profile language to Spanish
+  type: http
+  seq: 13
+}
+
+patch {
+  url: {{baseUrl}}/v1/me
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "language": "es"
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.language: eq es
+}

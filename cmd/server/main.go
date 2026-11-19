@@ -21,6 +21,7 @@ import (
 	"github.com/StreamNext/Backend/internal/rest"
 	"github.com/StreamNext/Backend/internal/service"
 	"github.com/StreamNext/Backend/internal/social"
+	"github.com/StreamNext/Backend/internal/tvdb"
 )
 
 const accessTokenTTL = 15 * time.Minute
@@ -75,10 +76,15 @@ func run(log *zap.Logger) error {
 	})
 	devices := service.NewDevices(repository.NewDevices(pool), time.Now)
 	log.Info("sign-in providers", zap.Bool("apple", cfg.Social.AppleClientID != ""), zap.Int("google_client_ids", len(cfg.Social.GoogleClientIDs)))
+	catalog := service.NewCatalog(service.CatalogDeps{
+		Source: tvdb.New(tvdb.Config{APIKey: cfg.TVDB.APIKey, BaseURL: cfg.TVDB.BaseURL}, &http.Client{Timeout: 30 * time.Second}, time.Now),
+		Repo:   repository.NewCatalog(pool), Users: users, Now: time.Now, Log: log,
+	})
+	log.Info("catalog", zap.Bool("tvdb_configured", cfg.TVDB.APIKey != ""))
 	account := service.NewAccount(service.AccountDeps{Users: users, Sessions: tokens, Hasher: hasher, Auth: authService, Now: time.Now, Log: log})
 
 	api, err := rest.NewServer(rest.Deps{
-		DB: pool, Auth: authService, Verification: verification, Reset: passwordReset, Account: account, Social: socialAuth, Devices: devices,
+		DB: pool, Auth: authService, Verification: verification, Reset: passwordReset, Account: account, Social: socialAuth, Devices: devices, Catalog: catalog,
 		Profile: service.NewProfileService(users, time.Now), Tokens: jwt, Limits: rest.DefaultLimits(), Log: log,
 	})
 	if err != nil {

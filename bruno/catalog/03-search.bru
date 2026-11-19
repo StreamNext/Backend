@@ -1,0 +1,24 @@
+meta {
+  name: Search for a show
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/v1/search/series?query=breaking%20bad
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.page: eq 1
+  res.body.results[0].id: eq 81189
+  res.body.results[0].name: eq Breaking Bad
+  res.body.results[0].status: eq ended
+  res.body.results[0].network: eq AMC
+}

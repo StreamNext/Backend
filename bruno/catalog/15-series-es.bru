@@ -1,0 +1,22 @@
+meta {
+  name: The same series in Spanish
+  type: http
+  seq: 15
+}
+
+get {
+  url: {{baseUrl}}/v1/series/327417
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.name: eq La casa de papel
+  res.body.genres[1].name: eq Crimen
+  res.body.originalName: eq La casa de papel
+}

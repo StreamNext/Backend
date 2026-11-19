@@ -1,0 +1,20 @@
+meta {
+  name: An unknown series is a 404
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{baseUrl}}/v1/series/424242
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+assert {
+  res.status: eq 404
+  res.body.code: eq not_found
+}

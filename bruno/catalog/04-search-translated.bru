@@ -1,0 +1,22 @@
+meta {
+  name: Search shows the English name of a Spanish show
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/v1/search/series?query=la%20casa%20de%20papel
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.results[0].id: eq 327417
+  res.body.results[0].name: eq Money Heist
+  res.body.results[0].originalName: eq La casa de papel
+}

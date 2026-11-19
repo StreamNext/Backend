@@ -53,7 +53,7 @@ func TestUsersNotFound(t *testing.T) {
 	assert.ErrorIs(t, err, service.ErrNotFound)
 	_, err = repo.GetByEmail(context.Background(), "nobody@example.com")
 	assert.ErrorIs(t, err, service.ErrNotFound)
-	_, err = repo.UpdateProfile(context.Background(), uuid.New(), nil, nil, now)
+	_, err = repo.UpdateProfile(context.Background(), uuid.New(), nil, nil, nil, now)
 	assert.ErrorIs(t, err, service.ErrNotFound)
 }
 
@@ -63,13 +63,13 @@ func TestUsersUpdateProfileChangesOnlyGivenFields(t *testing.T) {
 	u := newUser(t, "ana@example.com")
 
 	name := "Ana María"
-	got, err := repo.UpdateProfile(ctx, u.ID, &name, nil, now)
+	got, err := repo.UpdateProfile(ctx, u.ID, &name, nil, nil, now)
 	require.NoError(t, err)
 	assert.Equal(t, "Ana María", got.DisplayName)
 	assert.Equal(t, "UTC", got.Timezone, "timezone untouched")
 
 	tz := "Europe/Madrid"
-	got, err = repo.UpdateProfile(ctx, u.ID, nil, &tz, now)
+	got, err = repo.UpdateProfile(ctx, u.ID, nil, &tz, nil, now)
 	require.NoError(t, err)
 	assert.Equal(t, "Europe/Madrid", got.Timezone)
 	assert.Equal(t, "Ana María", got.DisplayName, "name untouched")
@@ -165,4 +165,24 @@ func TestUsersClearPassword(t *testing.T) {
 	require.NoError(t, repo.ClearPassword(ctx, u.ID, now), "clearing twice is fine")
 
 	assert.ErrorIs(t, repo.ClearPassword(ctx, uuid.New(), now), service.ErrNotFound)
+}
+
+func TestUsersLanguage(t *testing.T) {
+	reset(t)
+	ctx, repo := context.Background(), NewUsers(testPool)
+	u := newUser(t, "ana@example.com")
+	assert.Equal(t, service.LanguageEnglish, u.Language, "new users get English")
+
+	es := "es"
+	got, err := repo.UpdateProfile(ctx, u.ID, nil, nil, &es, now)
+	require.NoError(t, err)
+	assert.Equal(t, service.LanguageSpanish, got.Language)
+	assert.Equal(t, "Ana", got.DisplayName, "only the language changed")
+
+	byEmail, _ := repo.GetByEmail(ctx, "ana@example.com")
+	assert.Equal(t, service.LanguageSpanish, byEmail.Language, "and it is stored")
+
+	fr := "fr"
+	_, err = repo.UpdateProfile(ctx, u.ID, nil, nil, &fr, now)
+	assert.Error(t, err, "the CHECK constraint is the backstop behind the service's validation")
 }

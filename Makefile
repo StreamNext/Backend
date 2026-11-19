@@ -11,7 +11,7 @@ export SOPS_AGE_KEY_FILE := $(AGE_KEY_FILE)
 endif
 
 # generate = API server (gen/api, gitignored) + sqlc (internal/sqlc, committed).
-.PHONY: generate generate-api generate-sql run migrate test bruno db-env db-up db-down secrets-encrypt secrets-decrypt
+.PHONY: generate generate-api generate-sql run migrate tvdb-sync tvdb-record test bruno db-env db-up db-down secrets-encrypt secrets-decrypt
 
 generate: generate-api generate-sql
 
@@ -27,6 +27,14 @@ run:
 
 migrate:
 	sops exec-env $(ENV).enc.env 'go run ./cmd/migrate'
+
+# Applies TheTVDB's changes to the series we store (needs TVDB_API_KEY). Cloud Scheduler runs this hourly once deployed.
+tvdb-sync:
+	sops exec-env $(ENV).enc.env 'go run ./cmd/jobs/tvdb-sync'
+
+# Re-record the TheTVDB fixtures from the real API (needs TVDB_API_KEY); see cmd/tvdbrecord.
+tvdb-record:
+	sops exec-env $(ENV).enc.env 'go run ./cmd/tvdbrecord'
 
 # Unit + testcontainers tests with a 90% coverage gate on internal/, excluding generated sqlc code and the testdb helper.
 test: generate-api

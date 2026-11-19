@@ -34,7 +34,7 @@ func (q *Queries) ClearUserPassword(ctx context.Context, arg ClearUserPasswordPa
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (email, password_hash, email_verified_at, display_name, timezone)
 VALUES ($1, $2, $3, $4, $5)
-RETURNING id, email, password_hash, email_verified_at, display_name, timezone, created_at, updated_at
+RETURNING id, email, password_hash, email_verified_at, display_name, timezone, created_at, updated_at, language
 `
 
 type CreateUserParams struct {
@@ -63,6 +63,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.Timezone,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Language,
 	)
 	return i, err
 }
@@ -80,7 +81,7 @@ func (q *Queries) DeleteUser(ctx context.Context, id uuid.UUID) (int64, error) {
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, password_hash, email_verified_at, display_name, timezone, created_at, updated_at FROM users WHERE email = $1
+SELECT id, email, password_hash, email_verified_at, display_name, timezone, created_at, updated_at, language FROM users WHERE email = $1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
@@ -95,12 +96,13 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.Timezone,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Language,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, password_hash, email_verified_at, display_name, timezone, created_at, updated_at FROM users WHERE id = $1
+SELECT id, email, password_hash, email_verified_at, display_name, timezone, created_at, updated_at, language FROM users WHERE id = $1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
@@ -115,6 +117,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.Timezone,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Language,
 	)
 	return i, err
 }
@@ -160,14 +163,16 @@ const updateUserProfile = `-- name: UpdateUserProfile :one
 UPDATE users
 SET display_name = COALESCE($1, display_name),
     timezone     = COALESCE($2, timezone),
-    updated_at   = $3
-WHERE id = $4
-RETURNING id, email, password_hash, email_verified_at, display_name, timezone, created_at, updated_at
+    language     = COALESCE($3, language),
+    updated_at   = $4
+WHERE id = $5
+RETURNING id, email, password_hash, email_verified_at, display_name, timezone, created_at, updated_at, language
 `
 
 type UpdateUserProfileParams struct {
 	DisplayName pgtype.Text
 	Timezone    pgtype.Text
+	Language    pgtype.Text
 	Now         time.Time
 	ID          uuid.UUID
 }
@@ -176,6 +181,7 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 	row := q.db.QueryRow(ctx, updateUserProfile,
 		arg.DisplayName,
 		arg.Timezone,
+		arg.Language,
 		arg.Now,
 		arg.ID,
 	)
@@ -189,6 +195,7 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 		&i.Timezone,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Language,
 	)
 	return i, err
 }

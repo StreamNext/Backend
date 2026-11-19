@@ -13,6 +13,7 @@ SELECT * FROM users WHERE id = $1;
 UPDATE users
 SET display_name = COALESCE(sqlc.narg('display_name'), display_name),
     timezone     = COALESCE(sqlc.narg('timezone'), timezone),
+    language     = COALESCE(sqlc.narg('language'), language),
     updated_at   = sqlc.arg('now')
 WHERE id = sqlc.arg('id')
 RETURNING *;

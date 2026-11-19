@@ -44,9 +44,9 @@ func (r *Users) GetByID(ctx context.Context, id uuid.UUID) (service.User, error)
 	return toUser(row), nil
 }
 
-func (r *Users) UpdateProfile(ctx context.Context, id uuid.UUID, displayName, timezone *string, now time.Time) (service.User, error) {
+func (r *Users) UpdateProfile(ctx context.Context, id uuid.UUID, displayName, timezone, language *string, now time.Time) (service.User, error) {
 	row, err := r.q.UpdateUserProfile(ctx, sqlc.UpdateUserProfileParams{
-		ID: id, DisplayName: text(displayName), Timezone: text(timezone), Now: now,
+		ID: id, DisplayName: text(displayName), Timezone: text(timezone), Language: text(language), Now: now,
 	})
 	if err != nil {
 		return service.User{}, notFound(err)
@@ -77,6 +77,6 @@ func toUser(u sqlc.User) service.User {
 	}
 	return service.User{
 		ID: u.ID, Email: u.Email, PasswordHash: hash, EmailVerifiedAt: u.EmailVerifiedAt,
-		DisplayName: u.DisplayName, Timezone: u.Timezone,
+		DisplayName: u.DisplayName, Timezone: u.Timezone, Language: service.Language(u.Language),
 	}
 }

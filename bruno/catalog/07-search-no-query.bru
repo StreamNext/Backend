@@ -1,0 +1,20 @@
+meta {
+  name: A search without a query is a 400
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/v1/search/series
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+assert {
+  res.status: eq 400
+  res.body.code: eq invalid_argument
+}

@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
@@ -73,7 +75,7 @@ func (f *fakeUsers) GetByID(_ context.Context, id uuid.UUID) (User, error) {
 	return u, nil
 }
 
-func (f *fakeUsers) UpdateProfile(_ context.Context, id uuid.UUID, name, tz *string, _ time.Time) (User, error) {
+func (f *fakeUsers) UpdateProfile(_ context.Context, id uuid.UUID, name, tz, lang *string, _ time.Time) (User, error) {
 	if err := f.fail["UpdateProfile"]; err != nil {
 		return User{}, err
 	}
@@ -86,6 +88,9 @@ func (f *fakeUsers) UpdateProfile(_ context.Context, id uuid.UUID, name, tz *str
 	}
 	if tz != nil {
 		u.Timezone = *tz
+	}
+	if lang != nil {
+		u.Language = Language(*lang)
 	}
 	f.byID[id] = u
 	return u, nil
@@ -460,5 +465,190 @@ func (f *fakeDevices) Delete(_ context.Context, userID, deviceID uuid.UUID) erro
 		}
 	}
 	f.rows = kept
+	return nil
+}
+
+// --- catalog -------------------------------------------------------------------------------
+
+// fakeSource stands in for TheTVDB and records how it was used.
+type fakeSource struct {
+	series       map[int64]SeriesData
+	pages        map[string]SearchPage // "query|page"
+	updates      []SeriesUpdate
+	fail         failures
+	failSeries   map[int64]error
+	searchCalls  int
+	fetchCalls   map[int64]int
+	updatesSince []time.Time
+}
+
+func newFakeSource() *fakeSource {
+	return &fakeSource{series: map[int64]SeriesData{}, pages: map[string]SearchPage{}, fail: failures{}, failSeries: map[int64]error{}, fetchCalls: map[int64]int{}}
+}
+
+func (f *fakeSource) Search(_ context.Context, query string, page int) (SearchPage, error) {
+	f.searchCalls++
+	if err := f.fail["Search"]; err != nil {
+		return SearchPage{}, err
+	}
+	return f.pages[fmt.Sprintf("%s|%d", query, page)], nil
+}
+
+func (f *fakeSource) FetchSeries(_ context.Context, id int64) (SeriesData, error) {
+	f.fetchCalls[id]++
+	if err := f.fail["FetchSeries"]; err != nil {
+		return SeriesData{}, err
+	}
+	if err := f.failSeries[id]; err != nil {
+		return SeriesData{}, err
+	}
+	d, ok := f.series[id]
+	if !ok {
+		return SeriesData{}, ErrSourceNotFound
+	}
+	return d, nil
+}
+
+func (f *fakeSource) SeriesUpdates(_ context.Context, since time.Time) ([]SeriesUpdate, error) {
+	f.updatesSince = append(f.updatesSince, since)
+	if err := f.fail["SeriesUpdates"]; err != nil {
+		return nil, err
+	}
+	return f.updates, nil
+}
+
+// fakeCatalogRepo mirrors the Postgres repository: episodes are upserted by id and vanished ones removed,
+// season episode counts come from the stored episodes, and Save stamps SyncedAt.
+type fakeCatalogRepo struct {
+	series   map[int64]SeriesData
+	episodes map[int64]map[int64]EpisodeData // series id -> episode id -> episode
+	fail     failures
+	saves    map[int64]int
+}
+
+func newFakeCatalogRepo() *fakeCatalogRepo {
+	return &fakeCatalogRepo{series: map[int64]SeriesData{}, episodes: map[int64]map[int64]EpisodeData{}, fail: failures{}, saves: map[int64]int{}}
+}
+
+func (f *fakeCatalogRepo) GetSeries(_ context.Context, id int64) (SeriesData, error) {
+	if err := f.fail["GetSeries"]; err != nil {
+		return SeriesData{}, err
+	}
+	d, ok := f.series[id]
+	if !ok {
+		return SeriesData{}, ErrNotFound
+	}
+	d.Episodes = nil
+	d.Seasons = append([]Season(nil), d.Seasons...)
+	for i, s := range d.Seasons {
+		d.Seasons[i].EpisodeCount = 0
+		for _, e := range f.episodes[id] {
+			if e.SeasonNumber == s.Number {
+				d.Seasons[i].EpisodeCount++
+			}
+		}
+	}
+	return d, nil
+}
+
+func (f *fakeCatalogRepo) GetEpisodes(_ context.Context, seriesID int64, season *int) ([]EpisodeData, error) {
+	if err := f.fail["GetEpisodes"]; err != nil {
+		return nil, err
+	}
+	var out []EpisodeData
+	for _, e := range f.episodes[seriesID] {
+		if season == nil || *season == e.SeasonNumber {
+			out = append(out, e)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].SeasonNumber != out[j].SeasonNumber {
+			return out[i].SeasonNumber < out[j].SeasonNumber
+		}
+		return out[i].Number < out[j].Number
+	})
+	return out, nil
+}
+
+func (f *fakeCatalogRepo) Save(_ context.Context, d SeriesData, now time.Time) error {
+	if err := f.fail["Save"]; err != nil {
+		return err
+	}
+	d.SyncedAt = now
+	kept := map[int64]EpisodeData{}
+	for _, e := range d.Episodes {
+		kept[e.ID] = e
+	}
+	f.episodes[d.ID] = kept // upsert by id and drop the vanished, in effect
+	d.Episodes = nil
+	f.series[d.ID] = d
+	f.saves[d.ID]++
+	return nil
+}
+
+func (f *fakeCatalogRepo) Delete(_ context.Context, id int64) error {
+	if err := f.fail["Delete"]; err != nil {
+		return err
+	}
+	delete(f.series, id)
+	delete(f.episodes, id)
+	return nil
+}
+
+func (f *fakeCatalogRepo) IDs(_ context.Context) ([]int64, error) {
+	if err := f.fail["IDs"]; err != nil {
+		return nil, err
+	}
+	var ids []int64
+	for id := range f.series {
+		ids = append(ids, id)
+	}
+	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	return ids, nil
+}
+
+func (f *fakeCatalogRepo) Stale(_ context.Context, before time.Time, limit int) ([]int64, error) {
+	if err := f.fail["Stale"]; err != nil {
+		return nil, err
+	}
+	var rows []SeriesData
+	for _, d := range f.series {
+		if d.SyncedAt.Before(before) {
+			rows = append(rows, d)
+		}
+	}
+	sort.Slice(rows, func(i, j int) bool { return rows[i].SyncedAt.Before(rows[j].SyncedAt) })
+	var ids []int64
+	for i := 0; i < len(rows) && i < limit; i++ {
+		ids = append(ids, rows[i].ID)
+	}
+	return ids, nil
+}
+
+type fakeSyncState struct {
+	values map[string]string
+	fail   failures
+}
+
+func newFakeSyncState() *fakeSyncState {
+	return &fakeSyncState{values: map[string]string{}, fail: failures{}}
+}
+
+func (f *fakeSyncState) Get(_ context.Context, key string) (string, error) {
+	if err := f.fail["Get"]; err != nil {
+		return "", err
+	}
+	v, ok := f.values[key]
+	if !ok {
+		return "", ErrNotFound
+	}
+	return v, nil
+}
+
+func (f *fakeSyncState) Set(_ context.Context, key, value string, _ time.Time) error {
+	if err := f.fail["Set"]; err != nil {
+		return err
+	}
+	f.values[key] = value
 	return nil
 }

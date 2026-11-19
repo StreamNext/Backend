@@ -1,0 +1,68 @@
+{
+ "data": [
+  {
+   "first_air_time": "2008-01-20",
+   "image_url": "https://artworks.thetvdb.com/banners/posters/81189-10.jpg",
+   "name": "Breaking Bad",
+   "network": "AMC",
+   "overview": "Overview placeholder",
+   "overviews": {
+    "eng": "Overview placeholder (eng)",
+    "spa": "Overview placeholder (spa)"
+   },
+   "primary_language": "eng",
+   "status": "Ended",
+   "thumbnail": "https://artworks.thetvdb.com/banners/posters/81189-10_t.jpg",
+   "translations": {
+    "eng": "Breaking Bad",
+    "spa": "Breaking Bad"
+   },
+   "tvdb_id": "81189",
+   "type": "series",
+   "year": "2008"
+  },
+  {
+   "first_air_time": "2016-01-24",
+   "image_url": "https://artworks.thetvdb.com/banners/images/missing/series.jpg",
+   "name": "Breaking Band",
+   "network": "AXS TV",
+   "overview": "Overview placeholder",
+   "overviews": {
+    "eng": "Overview placeholder (eng)"
+   },
+   "primary_language": "eng",
+   "status": "Ended",
+   "translations": {
+    "eng": "Breaking Band"
+   },
+   "tvdb_id": "306432",
+   "type": "series",
+   "year": "2016"
+  },
+  {
+   "first_air_time": "2018-06-10",
+   "image_url": "https://artworks.thetvdb.com/banners/posters/5b22b772b154b.jpg",
+   "name": "Breaking The Band",
+   "network": "ReelzChannel",
+   "overview": "Overview placeholder",
+   "overviews": {
+    "eng": "Overview placeholder (eng)"
+   },
+   "primary_language": "eng",
+   "status": "Ended",
+   "thumbnail": "https://artworks.thetvdb.com/banners/posters/5b22b772b154b_t.jpg",
+   "translations": {
+    "eng": "Breaking The Band"
+   },
+   "tvdb_id": "348998",
+   "type": "series",
+   "year": "2018"
+  }
+ ],
+ "links": {
+  "next": null,
+  "page_size": 20,
+  "total_items": 3
+ },
+ "status": "success"
+}

@@ -15,7 +15,7 @@ func setEnv(t *testing.T, overrides map[string]string) {
 	t.Helper()
 	base := map[string]string{
 		"PORT": "", "DATABASE_URL": "postgres://x", "JWT_SECRET": goodSecret, "REFRESH_GRACE_SECONDS": "",
-		"ENV": "", "APP_BASE_URL": "", "MAIL_PROVIDER": "", "MAIL_FROM": "", "RESEND_API_KEY": "", "APPLE_CLIENT_ID": "", "GOOGLE_CLIENT_IDS": "",
+		"ENV": "", "APP_BASE_URL": "", "MAIL_PROVIDER": "", "MAIL_FROM": "", "RESEND_API_KEY": "", "APPLE_CLIENT_ID": "", "GOOGLE_CLIENT_IDS": "", "TVDB_API_KEY": "", "TVDB_BASE_URL": "",
 	}
 	for k, v := range overrides {
 		base[k] = v
@@ -37,6 +37,27 @@ func TestLoadDefaults(t *testing.T) {
 	assert.Equal(t, "http://localhost:3000", c.AppBaseURL)
 	assert.Equal(t, "log", c.Mail.Provider)
 	assert.Equal(t, SocialConfig{}, c.Social, "no provider is enabled unless its client id is set")
+	assert.Equal(t, TVDBConfig{}, c.TVDB, "no key: the catalog is disabled")
+}
+
+func TestLoadTVDB(t *testing.T) {
+	setEnv(t, map[string]string{"TVDB_API_KEY": "  a-key  ", "TVDB_BASE_URL": "http://tvdb:8081/v4"})
+	c, err := Load()
+	require.NoError(t, err)
+	assert.Equal(t, TVDBConfig{APIKey: "a-key", BaseURL: "http://tvdb:8081/v4"}, c.TVDB)
+}
+
+func TestTVDBFromEnvStandsAlone(t *testing.T) {
+	t.Setenv("JWT_SECRET", "") // the job has no JWT secret and must not need one
+	t.Setenv("TVDB_API_KEY", "k")
+	t.Setenv("TVDB_BASE_URL", "")
+	c, err := TVDBFromEnv()
+	require.NoError(t, err)
+	assert.Equal(t, TVDBConfig{APIKey: "k"}, c)
+
+	t.Setenv("TVDB_BASE_URL", "not a url")
+	_, err = TVDBFromEnv()
+	assert.ErrorContains(t, err, "TVDB_BASE_URL")
 }
 
 func TestLoadSocialProviders(t *testing.T) {
@@ -78,6 +99,7 @@ func TestLoadFailsFast(t *testing.T) {
 		"relative base url":     {map[string]string{"APP_BASE_URL": "/verify"}, "APP_BASE_URL"},
 		"non-http base url":     {map[string]string{"APP_BASE_URL": "ftp://x.com"}, "APP_BASE_URL"},
 		"unknown mail provider": {map[string]string{"MAIL_PROVIDER": "smtp"}, "MAIL_PROVIDER"},
+		"relative tvdb url":     {map[string]string{"TVDB_BASE_URL": "/v4"}, "TVDB_BASE_URL"},
 		"log mail in prod":      {map[string]string{"ENV": "prod"}, "not allowed"},
 		"resend without key":    {map[string]string{"MAIL_PROVIDER": "resend", "MAIL_FROM": "a@b.co"}, "RESEND_API_KEY"},
 		"resend without from":   {map[string]string{"MAIL_PROVIDER": "resend", "RESEND_API_KEY": "k"}, "MAIL_FROM"},

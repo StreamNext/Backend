@@ -14,6 +14,7 @@ import (
 type UpdateProfileInput struct {
 	DisplayName *string
 	Timezone    *string
+	Language    *string // "en" or "es"
 }
 
 // ProfileService reads and updates the signed-in user's own profile.
@@ -39,7 +40,7 @@ func (p *ProfileService) Get(ctx context.Context, id uuid.UUID) (User, error) {
 }
 
 func (p *ProfileService) Update(ctx context.Context, id uuid.UUID, in UpdateProfileInput) (User, error) {
-	if in.DisplayName == nil && in.Timezone == nil {
+	if in.DisplayName == nil && in.Timezone == nil && in.Language == nil {
 		return User{}, invalid("nothing to update")
 	}
 	if in.DisplayName != nil {
@@ -56,7 +57,10 @@ func (p *ProfileService) Update(ctx context.Context, id uuid.UUID, in UpdateProf
 		}
 		in.Timezone = &tz
 	}
-	u, err := p.users.UpdateProfile(ctx, id, in.DisplayName, in.Timezone, p.now())
+	if in.Language != nil && !Language(*in.Language).Valid() {
+		return User{}, invalid("language must be en or es")
+	}
+	u, err := p.users.UpdateProfile(ctx, id, in.DisplayName, in.Timezone, in.Language, p.now())
 	if errors.Is(err, ErrNotFound) {
 		return User{}, apperr.New(apperr.Unauthenticated, "invalid credentials")
 	}

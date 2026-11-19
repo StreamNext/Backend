@@ -19,6 +19,7 @@ func TestSecuredRoutesComeFromTheContract(t *testing.T) {
 	assert.Equal(t, map[string]bool{
 		"GET /v1/me": true, "PATCH /v1/me": true, "DELETE /v1/me": true, "POST /v1/me/change-password": true,
 		"PUT /v1/devices/{deviceId}": true, "DELETE /v1/devices/{deviceId}": true,
+		"GET /v1/search/series": true, "GET /v1/series/{seriesId}": true, "GET /v1/series/{seriesId}/episodes": true,
 	}, secured)
 }
 
@@ -40,6 +41,9 @@ func TestSecuredRoutesRejectMissingOrBadCredentials(t *testing.T) {
 				{http.MethodPost, "/v1/me/change-password", `{}`},
 				{http.MethodPut, "/v1/devices/" + devID, `{"fcmToken":"t","platform":"ios"}`},
 				{http.MethodDelete, "/v1/devices/" + devID, ""},
+				{http.MethodGet, "/v1/search/series?query=breaking", ""},
+				{http.MethodGet, "/v1/series/81189", ""},
+				{http.MethodGet, "/v1/series/81189/episodes?season=1", ""},
 			} {
 				requireError(t, send(t, h.handler, call.method, call.path, call.body, headers), http.StatusUnauthorized, "unauthenticated")
 			}
@@ -49,6 +53,7 @@ func TestSecuredRoutesRejectMissingOrBadCredentials(t *testing.T) {
 	assert.Zero(t, h.account.deleteCalls)
 	assert.Zero(t, h.account.gotUser)
 	assert.Zero(t, h.devices.registerCalls+h.devices.removeCalls)
+	assert.Zero(t, h.catalog.calls, "the catalog is never reached without a token")
 }
 
 func TestHeadRequestToASecuredRouteIsAlsoChecked(t *testing.T) {
@@ -99,6 +104,20 @@ func TestDeviceRoutesCannotBeReachedWithoutAToken(t *testing.T) {
 			rec := send(t, h.handler, method, path, `{"fcmToken":"t","platform":"ios"}`, nil)
 			assert.Less(t, 299, rec.Code, "%s %s must not succeed without a token", method, path)
 			assert.Zero(t, h.devices.registerCalls+h.devices.removeCalls, "%s %s", method, path)
+		}
+	}
+}
+
+func TestCatalogRoutesCannotBeReachedWithoutAToken(t *testing.T) {
+	for _, path := range []string{
+		"/v1/search/series?query=ab", "/v1/search/series", "//v1/search/series?query=ab", "/v1/series/1", "/v1/series/1/", "/v1/series/abc",
+		"/v1/./series/1", "/v1/x/../series/1/episodes", "/v1/series/1/episodes?season=0", "/v1/SERIES/1", "/v1/series/1%2Fepisodes",
+	} {
+		for _, method := range []string{http.MethodGet, http.MethodHead, http.MethodPost, http.MethodDelete} {
+			h := newHarness(t)
+			rec := send(t, h.handler, method, path, "", nil)
+			assert.Less(t, 299, rec.Code, "%s %s must not succeed without a token", method, path)
+			assert.Zero(t, h.catalog.calls, "%s %s", method, path)
 		}
 	}
 }

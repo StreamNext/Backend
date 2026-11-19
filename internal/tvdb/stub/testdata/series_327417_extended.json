@@ -1,0 +1,218 @@
+{
+ "data": {
+  "airsDays": {
+   "friday": true,
+   "monday": false,
+   "saturday": false,
+   "sunday": false,
+   "thursday": false,
+   "tuesday": false,
+   "wednesday": false
+  },
+  "airsTime": "03:00",
+  "averageRuntime": 57,
+  "defaultSeasonType": 1,
+  "firstAired": "2017-05-02",
+  "genres": [
+   {
+    "id": 12,
+    "name": "Drama",
+    "slug": "drama"
+   },
+   {
+    "id": 14,
+    "name": "Crime",
+    "slug": "crime"
+   },
+   {
+    "id": 19,
+    "name": "Action",
+    "slug": "action"
+   },
+   {
+    "id": 24,
+    "name": "Thriller",
+    "slug": "thriller"
+   },
+   {
+    "id": 31,
+    "name": "Mystery",
+    "slug": "mystery"
+   }
+  ],
+  "id": 327417,
+  "image": "https://artworks.thetvdb.com/banners/posters/5d30cc0b4a75d.jpg",
+  "lastAired": "2021-12-03",
+  "lastUpdated": "2026-09-26 21:16:10",
+  "latestNetwork": {
+   "name": "Netflix"
+  },
+  "name": "La casa de papel",
+  "nextAired": "",
+  "originalCountry": "esp",
+  "originalLanguage": "spa",
+  "originalNetwork": {
+   "name": "Antena 3"
+  },
+  "overview": "Overview placeholder",
+  "seasons": [
+   {
+    "id": 709178,
+    "number": 0,
+    "type": {
+     "id": 1,
+     "type": "official"
+    }
+   },
+   {
+    "id": 709183,
+    "image": "https://artworks.thetvdb.com/banners/series/327417/seasons/709183/posters/62015403.jpg",
+    "number": 1,
+    "type": {
+     "id": 1,
+     "type": "official"
+    }
+   },
+   {
+    "id": 804601,
+    "image": "https://artworks.thetvdb.com/banners/series/327417/seasons/804601/posters/5f148012c86c7.jpg",
+    "number": 2,
+    "type": {
+     "id": 1,
+     "type": "official"
+    }
+   },
+   {
+    "id": 1929020,
+    "image": "https://artworks.thetvdb.com/banners/v4/season/1929020/banners/62dabcd4f0d27.jpg",
+    "number": 3,
+    "type": {
+     "id": 1,
+     "type": "official"
+    }
+   },
+   {
+    "id": 1765604,
+    "number": 0,
+    "type": {
+     "id": 2,
+     "type": "dvd"
+    }
+   },
+   {
+    "id": 1765606,
+    "image": "https://artworks.thetvdb.com/banners/seasons/5d30cd95c9ba1.jpg",
+    "number": 1,
+    "type": {
+     "id": 2,
+     "type": "dvd"
+    }
+   },
+   {
+    "id": 1765603,
+    "number": 1,
+    "type": {
+     "id": 3,
+     "type": "absolute"
+    }
+   },
+   {
+    "id": 1801998,
+    "image": "https://artworks.thetvdb.com/banners/series/327417/seasons/1801998/posters/5ea19d17bd154.jpg",
+    "name": "Parte 1",
+    "number": 1,
+    "type": {
+     "id": 4,
+     "type": "alternate"
+    }
+   },
+   {
+    "id": 1801999,
+    "image": "https://artworks.thetvdb.com/banners/series/327417/seasons/1801999/posters/5ea19d3ae135c.jpg",
+    "name": "Parte 2",
+    "number": 2,
+    "type": {
+     "id": 4,
+     "type": "alternate"
+    }
+   },
+   {
+    "id": 1802001,
+    "image": "https://artworks.thetvdb.com/banners/series/327417/seasons/1802001/posters/5ea19d4cb21d0.jpg",
+    "name": "Parte 3",
+    "number": 3,
+    "type": {
+     "id": 4,
+     "type": "alternate"
+    }
+   },
+   {
+    "id": 1805294,
+    "image": "https://artworks.thetvdb.com/banners/series/327417/seasons/1805294/posters/5ea19d5eb54f5.jpg",
+    "name": "Parte 4",
+    "number": 4,
+    "type": {
+     "id": 4,
+     "type": "alternate"
+    }
+   },
+   {
+    "id": 1929021,
+    "image": "https://artworks.thetvdb.com/banners/v4/season/1929021/posters/61ab4e5ed7b87.jpg",
+    "name": "Parte 5",
+    "number": 5,
+    "type": {
+     "id": 4,
+     "type": "alternate"
+    }
+   },
+   {
+    "id": 1947393,
+    "number": 0,
+    "type": {
+     "id": 4,
+     "type": "alternate"
+    }
+   }
+  ],
+  "slug": "la-casa-de-papel",
+  "status": {
+   "name": "Ended"
+  },
+  "translations": {
+   "nameTranslations": [
+    {
+     "language": "eng",
+     "name": "Money Heist"
+    },
+    {
+     "isPrimary": true,
+     "language": "spa",
+     "name": "La casa de papel"
+    },
+    {
+     "isAlias": true,
+     "language": "eng",
+     "name": "La casa de papel"
+    },
+    {
+     "isAlias": true,
+     "language": "eng",
+     "name": "Papírový dům"
+    }
+   ],
+   "overviewTranslations": [
+    {
+     "language": "eng",
+     "overview": "Overview placeholder (eng)"
+    },
+    {
+     "isPrimary": true,
+     "language": "spa",
+     "overview": "Overview placeholder (spa)"
+    }
+   ]
+  }
+ },
+ "status": "success"
+}
