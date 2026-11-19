@@ -20,6 +20,7 @@ import (
 	"github.com/StreamNext/Backend/internal/repository"
 	"github.com/StreamNext/Backend/internal/rest"
 	"github.com/StreamNext/Backend/internal/service"
+	"github.com/StreamNext/Backend/internal/social"
 )
 
 const accessTokenTTL = 15 * time.Minute
@@ -65,10 +66,19 @@ func run(log *zap.Logger) error {
 		Users: users, Sessions: tokens, Tokens: repository.NewEmailTokens(pool), Mailer: mailer, Hasher: hasher,
 		BaseURL: cfg.AppBaseURL, Now: time.Now, Log: log,
 	})
+	identities := social.New(
+		social.Config{AppleClientID: cfg.Social.AppleClientID, GoogleClientIDs: cfg.Social.GoogleClientIDs},
+		&http.Client{Timeout: 10 * time.Second}, time.Now)
+	socialAuth := service.NewSocialAuth(service.SocialDeps{
+		Users: users, OAuth: repository.NewOAuthAccounts(pool), Sessions: tokens, Verifier: identities, Auth: authService,
+		Verification: verification, Now: time.Now, Log: log,
+	})
+	devices := service.NewDevices(repository.NewDevices(pool), time.Now)
+	log.Info("sign-in providers", zap.Bool("apple", cfg.Social.AppleClientID != ""), zap.Int("google_client_ids", len(cfg.Social.GoogleClientIDs)))
 	account := service.NewAccount(service.AccountDeps{Users: users, Sessions: tokens, Hasher: hasher, Auth: authService, Now: time.Now, Log: log})
 
 	api, err := rest.NewServer(rest.Deps{
-		DB: pool, Auth: authService, Verification: verification, Reset: passwordReset, Account: account,
+		DB: pool, Auth: authService, Verification: verification, Reset: passwordReset, Account: account, Social: socialAuth, Devices: devices,
 		Profile: service.NewProfileService(users, time.Now), Tokens: jwt, Limits: rest.DefaultLimits(), Log: log,
 	})
 	if err != nil {

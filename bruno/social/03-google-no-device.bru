@@ -1,0 +1,22 @@
+meta {
+  name: Google without a device id
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/v1/auth/google
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "idToken": "not.a.token"
+  }
+}
+
+assert {
+  res.status: eq 400
+  res.body.code: eq invalid_argument
+}

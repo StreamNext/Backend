@@ -115,6 +115,37 @@ func (a *stubAccount) Delete(_ context.Context, id uuid.UUID, password string) e
 	return a.err
 }
 
+type stubSocial struct {
+	session service.Session
+	err     error
+	got     service.SocialInput
+}
+
+func (s *stubSocial) SignIn(_ context.Context, in service.SocialInput) (service.Session, error) {
+	s.got = in
+	return s.session, s.err
+}
+
+type stubDevices struct {
+	err                error
+	registerCalls      int
+	removeCalls        int
+	gotUser, gotDevice uuid.UUID
+	gotToken           string
+	gotPlatform        service.Platform
+}
+
+func (d *stubDevices) Register(_ context.Context, userID, deviceID uuid.UUID, token string, platform service.Platform) error {
+	d.registerCalls++
+	d.gotUser, d.gotDevice, d.gotToken, d.gotPlatform = userID, deviceID, token, platform
+	return d.err
+}
+func (d *stubDevices) Remove(_ context.Context, userID, deviceID uuid.UUID) error {
+	d.removeCalls++
+	d.gotUser, d.gotDevice = userID, deviceID
+	return d.err
+}
+
 // stubTokens maps accepted bearer tokens to user ids.
 type stubTokens map[string]uuid.UUID
 
@@ -139,6 +170,8 @@ type harness struct {
 	verification *stubVerification
 	reset        *stubReset
 	account      *stubAccount
+	social       *stubSocial
+	devices      *stubDevices
 }
 
 // newHarness builds a Server with stub services. mutate may adjust Deps before construction.
@@ -147,10 +180,11 @@ func newHarness(t *testing.T, mutate ...func(*Deps)) *harness {
 	h := &harness{
 		auth:         &stubAuth{session: service.Session{AccessToken: "acc", RefreshToken: "ref", ExpiresIn: 900, User: fixture}},
 		profile:      &stubProfile{user: fixture},
-		verification: &stubVerification{}, reset: &stubReset{},
+		verification: &stubVerification{}, reset: &stubReset{}, devices: &stubDevices{},
+		social:  &stubSocial{session: service.Session{AccessToken: "acc3", RefreshToken: "ref3", ExpiresIn: 900, User: fixture}},
 		account: &stubAccount{session: service.Session{AccessToken: "acc2", RefreshToken: "ref2", ExpiresIn: 900, User: fixture}},
 	}
-	d := Deps{DB: fakeDB{}, Auth: h.auth, Verification: h.verification, Reset: h.reset, Account: h.account, Profile: h.profile,
+	d := Deps{DB: fakeDB{}, Auth: h.auth, Verification: h.verification, Reset: h.reset, Account: h.account, Social: h.social, Devices: h.devices, Profile: h.profile,
 		Tokens: stubTokens{"good-token": userA}, Log: zap.NewNop()}
 	for _, m := range mutate {
 		m(&d)

@@ -1,0 +1,19 @@
+meta {
+  name: Removing again is fine
+  type: http
+  seq: 8
+}
+
+delete {
+  url: {{baseUrl}}/v1/devices/{{deviceId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+assert {
+  res.status: eq 204
+}

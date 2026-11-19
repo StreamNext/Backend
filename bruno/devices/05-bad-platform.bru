@@ -1,0 +1,27 @@
+meta {
+  name: An unknown platform is a 400
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{baseUrl}}/v1/devices/{{deviceId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "fcmToken": "t",
+    "platform": "windows"
+  }
+}
+
+assert {
+  res.status: eq 400
+  res.body.code: eq invalid_argument
+}

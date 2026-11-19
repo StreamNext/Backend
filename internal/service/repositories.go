@@ -35,6 +35,15 @@ type RefreshToken struct {
 	ReplacedBy      *uuid.UUID
 }
 
+// NewUser is what the service asks a repository to create.
+type NewUser struct {
+	Email           string
+	PasswordHash    *string    // nil for accounts created through a provider
+	EmailVerifiedAt *time.Time // nil until the address is confirmed
+	DisplayName     string
+	Timezone        string
+}
+
 // NewToken is what the service asks a repository to store; the repository assigns the id.
 type NewToken struct {
 	UserID          uuid.UUID
@@ -46,12 +55,15 @@ type NewToken struct {
 
 type UserRepository interface {
 	// Create returns ErrEmailTaken if the email (case-insensitive) is already registered.
-	Create(ctx context.Context, email string, passwordHash *string, displayName, timezone string) (User, error)
+	Create(ctx context.Context, u NewUser) (User, error)
 	GetByEmail(ctx context.Context, email string) (User, error) // ErrNotFound
 	GetByID(ctx context.Context, id uuid.UUID) (User, error)    // ErrNotFound
 	// UpdateProfile changes only the non-nil fields.
 	UpdateProfile(ctx context.Context, id uuid.UUID, displayName, timezone *string, now time.Time) (User, error)
 	SetPassword(ctx context.Context, id uuid.UUID, passwordHash string, now time.Time) error // ErrNotFound
+	// ClearPassword leaves the account without a password, so it can only be entered via a provider
+	// or after a password reset.
+	ClearPassword(ctx context.Context, id uuid.UUID, now time.Time) error // ErrNotFound
 	// MarkEmailVerified is idempotent: a second call keeps the first verification time.
 	MarkEmailVerified(ctx context.Context, id uuid.UUID, now time.Time) error // ErrNotFound
 	// Delete removes the user; refresh and email tokens go with it (cascade).
@@ -113,4 +125,64 @@ type PasswordHasher interface {
 type AccessTokenIssuer interface {
 	// Issue returns a signed access token and its lifetime in seconds.
 	Issue(userID uuid.UUID) (string, int, error)
+}
+
+// --- social sign-in and devices ------------------------------------------------------------
+
+var (
+	ErrIdentityTaken        = errors.New("provider identity already linked")
+	ErrProviderDisabled     = errors.New("sign-in provider is not configured")
+	ErrInvalidIdentityToken = errors.New("invalid identity token")
+	ErrVerifierUnavailable  = errors.New("cannot verify identity tokens right now")
+)
+
+type Provider string
+
+const (
+	ProviderApple  Provider = "apple"
+	ProviderGoogle Provider = "google"
+)
+
+// Identity is who a provider says the signed-in person is, taken from a verified token.
+type Identity struct {
+	Provider      Provider
+	Subject       string // the provider's stable id for the person
+	Email         string
+	EmailVerified bool
+	Name          string
+}
+
+// IdentityVerifier checks a provider's ID token and returns the identity in it. It returns
+// ErrProviderDisabled, ErrInvalidIdentityToken or ErrVerifierUnavailable (possibly wrapped) when it cannot.
+// nonce is the raw nonce the client used, for providers that bind one (Apple).
+type IdentityVerifier interface {
+	Verify(ctx context.Context, provider Provider, idToken, nonce string) (Identity, error)
+}
+
+type OAuthRepository interface {
+	// FindUser returns the user an identity is linked to; ErrNotFound if it is not linked.
+	FindUser(ctx context.Context, provider Provider, subject string) (uuid.UUID, error)
+	// Link ties an identity to a user. ErrIdentityTaken if it is already linked (to anyone).
+	Link(ctx context.Context, userID uuid.UUID, id Identity, now time.Time) error
+}
+
+type Platform string
+
+const (
+	PlatformIOS     Platform = "ios"
+	PlatformAndroid Platform = "android"
+)
+
+type Device struct {
+	UserID, DeviceID uuid.UUID
+	FCMToken         string
+	Platform         Platform
+}
+
+type DeviceRepository interface {
+	// Upsert stores the device's push token for its user and removes that token from any other owner.
+	// ErrNotFound if the user no longer exists.
+	Upsert(ctx context.Context, d Device, now time.Time) error
+	// Delete is a no-op if the device is not registered.
+	Delete(ctx context.Context, userID, deviceID uuid.UUID) error
 }

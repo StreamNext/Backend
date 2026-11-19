@@ -18,6 +18,7 @@ func TestSecuredRoutesComeFromTheContract(t *testing.T) {
 	// accidentally unprotected one, shows up as a diff here.
 	assert.Equal(t, map[string]bool{
 		"GET /v1/me": true, "PATCH /v1/me": true, "DELETE /v1/me": true, "POST /v1/me/change-password": true,
+		"PUT /v1/devices/{deviceId}": true, "DELETE /v1/devices/{deviceId}": true,
 	}, secured)
 }
 
@@ -37,6 +38,8 @@ func TestSecuredRoutesRejectMissingOrBadCredentials(t *testing.T) {
 				{http.MethodPatch, "/v1/me", `{"displayName":"x"}`},
 				{http.MethodDelete, "/v1/me", ""},
 				{http.MethodPost, "/v1/me/change-password", `{}`},
+				{http.MethodPut, "/v1/devices/" + devID, `{"fcmToken":"t","platform":"ios"}`},
+				{http.MethodDelete, "/v1/devices/" + devID, ""},
 			} {
 				requireError(t, send(t, h.handler, call.method, call.path, call.body, headers), http.StatusUnauthorized, "unauthenticated")
 			}
@@ -45,6 +48,7 @@ func TestSecuredRoutesRejectMissingOrBadCredentials(t *testing.T) {
 	assert.Zero(t, h.profile.gotID, "the handlers never ran")
 	assert.Zero(t, h.account.deleteCalls)
 	assert.Zero(t, h.account.gotUser)
+	assert.Zero(t, h.devices.registerCalls+h.devices.removeCalls)
 }
 
 func TestHeadRequestToASecuredRouteIsAlsoChecked(t *testing.T) {
@@ -81,4 +85,20 @@ func TestAValidTokenWorksOnTheCanonicalPathOnly(t *testing.T) {
 	h := newHarness(t)
 	assert.Equal(t, http.StatusOK, send(t, h.handler, http.MethodGet, "/v1/me", "", bearer("good-token")).Code)
 	assert.Equal(t, http.StatusOK, send(t, h.handler, http.MethodGet, "/v1/me?x=1", "", bearer("good-token")).Code, "query strings are fine")
+}
+
+// Parameterised routes: the route pattern contains {deviceId}, so odd spellings of the path matter too.
+func TestDeviceRoutesCannotBeReachedWithoutAToken(t *testing.T) {
+	for _, path := range []string{
+		"/v1/devices/" + devID, "/v1/devices/" + devID + "?x=1", "//v1/devices/" + devID, "/v1/devices//" + devID,
+		"/v1/devices/./" + devID, "/v1/x/../devices/" + devID, "/v1/devices/" + devID + "/", "/v1/devices/not-a-uuid",
+		"/v1/DEVICES/" + devID, "/v1/devices/" + devID + "%2F..", "/v1/devices/",
+	} {
+		for _, method := range []string{http.MethodPut, http.MethodDelete, http.MethodGet, http.MethodHead, http.MethodPost} {
+			h := newHarness(t)
+			rec := send(t, h.handler, method, path, `{"fcmToken":"t","platform":"ios"}`, nil)
+			assert.Less(t, 299, rec.Code, "%s %s must not succeed without a token", method, path)
+			assert.Zero(t, h.devices.registerCalls+h.devices.removeCalls, "%s %s", method, path)
+		}
+	}
 }

@@ -1,0 +1,27 @@
+meta {
+  name: A malformed device id is a 400
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{baseUrl}}/v1/devices/not-a-uuid
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "fcmToken": "t",
+    "platform": "ios"
+  }
+}
+
+assert {
+  res.status: eq 400
+  res.body.code: eq invalid_argument
+}

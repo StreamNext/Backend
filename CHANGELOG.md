@@ -3,6 +3,16 @@
 Semver. Minor = new feature/endpoint, patch = fix, major = breaking contract change.
 The version is `internal/version/version.go`. Backend and Proto versions are independent; an entry says when it implements a new Proto version.
 
+## 0.4.0 — 2026-11-19
+Implements Proto 0.4.0 (social sign-in and devices, M1 slice 3).
+- `POST /v1/auth/apple` and `/v1/auth/google`. `internal/social` verifies the ID token (RS256 only, issuer, audience, expiry, Apple nonce as SHA-256) against the provider's keys, cached for 1h, refetched once on an unknown key id (at most once a minute) and kept through a short provider outage.
+- Account rules: a known identity signs in its user; a provider-verified email links to the existing account (**clearing the password and revoking the sessions of an account whose email was never verified**, so a pre-registered attacker is locked out); an unverified provider email never links (409); a new account is created otherwise. Providers always get 90-day device-bound sessions.
+- `PUT`/`DELETE /v1/devices/{deviceId}`: push (FCM) tokens, one owner per token (registering it moves it); concurrent registrations are retried. The first route with a path parameter.
+- `forgot-password` now also works for accounts without a password, so a social-only user can set one.
+- User creation takes a `NewUser` struct. Migration `00004` (`oauth_account`, `device`).
+- New config: `APPLE_CLIENT_ID`, `GOOGLE_CLIENT_IDS` (a provider without client ids answers 503). Strict rate-limit burst is now 40.
+- Bruno: devices and social flows (suite: 45 requests, 97 assertions).
+
 ## 0.3.0 — 2026-11-19
 Implements Proto 0.3.0 (auth email flows and account, M1 slice 2).
 - `POST /v1/auth/{verify-email,resend-verification,forgot-password,reset-password}`, `POST /v1/me/change-password`, `DELETE /v1/me`.

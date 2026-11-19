@@ -199,14 +199,24 @@ func TestForgotPasswordEmailsAResetLink(t *testing.T) {
 func TestForgotPasswordGivesNothingAway(t *testing.T) {
 	f := newFlows(t)
 	f.register(t, "ana@example.com", device)
-	social := User{ID: uuid.New(), Email: "social@example.com", DisplayName: "S"} // no password
-	f.users.byID[social.ID] = social
 	f.mailer.sent = nil
 
-	assert.NoError(t, f.reset.Request(f.ctx, "nobody@example.com"))
-	assert.NoError(t, f.reset.Request(f.ctx, "social@example.com"), "accounts without a password get no reset email")
+	assert.NoError(t, f.reset.Request(f.ctx, "nobody@example.com"), "unknown address")
 	assert.Empty(t, f.mailer.sent)
 	requireKind(t, f.reset.Request(f.ctx, "nope"), apperr.InvalidArgument)
+}
+
+func TestForgotPasswordWorksForAccountsWithoutAPassword(t *testing.T) {
+	f := newFlows(t)
+	social := User{ID: uuid.New(), Email: "social@example.com", DisplayName: "S"} // signed up with a provider
+	f.users.byID[social.ID] = social
+	require.False(t, f.loginWorks("social@example.com", "anything-at-all-1", device))
+
+	require.NoError(t, f.reset.Request(f.ctx, "social@example.com"))
+	require.Len(t, f.mailer.sent, 1, "the email proves ownership, so they may set a first password")
+	require.NoError(t, f.reset.Reset(f.ctx, f.mailer.last().token(), "my-first-password-1"))
+
+	assert.True(t, f.loginWorks("social@example.com", "my-first-password-1", device))
 }
 
 func TestForgotPasswordRespectsTheCooldownAndSupersedes(t *testing.T) {

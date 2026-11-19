@@ -1,6 +1,6 @@
 -- name: CreateUser :one
-INSERT INTO users (email, password_hash, display_name, timezone)
-VALUES ($1, $2, $3, $4)
+INSERT INTO users (email, password_hash, email_verified_at, display_name, timezone)
+VALUES ($1, $2, $3, $4, $5)
 RETURNING *;
 
 -- name: GetUserByEmail :one
@@ -27,3 +27,7 @@ WHERE id = $1;
 
 -- name: DeleteUser :execrows
 DELETE FROM users WHERE id = $1;
+
+-- name: ClearUserPassword :execrows
+UPDATE users SET password_hash = NULL, updated_at = sqlc.arg('now')::timestamptz
+WHERE id = $1;

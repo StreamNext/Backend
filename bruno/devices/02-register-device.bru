@@ -1,0 +1,26 @@
+meta {
+  name: Register the device's push token
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{baseUrl}}/v1/devices/{{deviceId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+body:json {
+  {
+    "fcmToken": "fcm-token-one",
+    "platform": "ios"
+  }
+}
+
+assert {
+  res.status: eq 204
+}

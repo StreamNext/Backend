@@ -23,6 +23,14 @@ type Config struct {
 	Env        string // "dev" or "prod"
 	AppBaseURL string // where email links point (the Web repo's pages), no trailing slash
 	Mail       MailConfig
+	Social     SocialConfig
+}
+
+// SocialConfig lists the client ids ID tokens must be issued for. A provider with none is disabled
+// (its endpoint answers 503).
+type SocialConfig struct {
+	AppleClientID   string   // the app's bundle id (or the Services id for web)
+	GoogleClientIDs []string // the iOS, Android and web client ids
 }
 
 type MailConfig struct {
@@ -49,7 +57,8 @@ func Load() (Config, error) {
 	c := Config{
 		Port: env("PORT", "8080"), DatabaseURL: dbURL, JWTSecret: os.Getenv("JWT_SECRET"), RefreshGrace: 10 * time.Second,
 		Env: env("ENV", "dev"), AppBaseURL: env("APP_BASE_URL", "http://localhost:3000"),
-		Mail: MailConfig{Provider: env("MAIL_PROVIDER", "log"), From: os.Getenv("MAIL_FROM"), ResendAPIKey: os.Getenv("RESEND_API_KEY")},
+		Mail:   MailConfig{Provider: env("MAIL_PROVIDER", "log"), From: os.Getenv("MAIL_FROM"), ResendAPIKey: os.Getenv("RESEND_API_KEY")},
+		Social: SocialConfig{AppleClientID: strings.TrimSpace(os.Getenv("APPLE_CLIENT_ID")), GoogleClientIDs: splitList(os.Getenv("GOOGLE_CLIENT_IDS"))},
 	}
 	if len(c.JWTSecret) < minJWTSecretLen {
 		return Config{}, fmt.Errorf("config: JWT_SECRET is required and must be at least %d bytes", minJWTSecretLen)
@@ -102,4 +111,15 @@ func env(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// splitList reads a comma-separated list, ignoring spaces and empty entries.
+func splitList(raw string) []string {
+	var out []string
+	for _, part := range strings.Split(raw, ",") {
+		if part = strings.TrimSpace(part); part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
 }

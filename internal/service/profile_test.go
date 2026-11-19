@@ -17,7 +17,7 @@ func str(s string) *string { return &s }
 func profileEnv(t *testing.T) (*ProfileService, *fakeUsers, User) {
 	t.Helper()
 	users := newFakeUsers()
-	u, err := users.Create(context.Background(), "ana@example.com", nil, "Ana", "UTC")
+	u, err := users.Create(context.Background(), NewUser{Email: "ana@example.com", DisplayName: "Ana", Timezone: "UTC"})
 	require.NoError(t, err)
 	return NewProfileService(users, (&clock{t: epoch}).Now), users, u
 }

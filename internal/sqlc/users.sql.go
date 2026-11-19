@@ -13,23 +13,43 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const clearUserPassword = `-- name: ClearUserPassword :execrows
+UPDATE users SET password_hash = NULL, updated_at = $2::timestamptz
+WHERE id = $1
+`
+
+type ClearUserPasswordParams struct {
+	ID  uuid.UUID
+	Now time.Time
+}
+
+func (q *Queries) ClearUserPassword(ctx context.Context, arg ClearUserPasswordParams) (int64, error) {
+	result, err := q.db.Exec(ctx, clearUserPassword, arg.ID, arg.Now)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (email, password_hash, display_name, timezone)
-VALUES ($1, $2, $3, $4)
+INSERT INTO users (email, password_hash, email_verified_at, display_name, timezone)
+VALUES ($1, $2, $3, $4, $5)
 RETURNING id, email, password_hash, email_verified_at, display_name, timezone, created_at, updated_at
 `
 
 type CreateUserParams struct {
-	Email        string
-	PasswordHash pgtype.Text
-	DisplayName  string
-	Timezone     string
+	Email           string
+	PasswordHash    pgtype.Text
+	EmailVerifiedAt *time.Time
+	DisplayName     string
+	Timezone        string
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
 	row := q.db.QueryRow(ctx, createUser,
 		arg.Email,
 		arg.PasswordHash,
+		arg.EmailVerifiedAt,
 		arg.DisplayName,
 		arg.Timezone,
 	)

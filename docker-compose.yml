@@ -20,5 +20,8 @@ services:
       DATABASE_URL: *dburl
       JWT_SECRET: bruno-and-ci-only-secret-never-used-for-real-0123456789
       REFRESH_GRACE_SECONDS: "0" # makes refresh-token reuse detection immediate, so Bruno can assert it
+      # Providers are enabled (so garbage tokens are a 401, not a 503) but no real token can pass.
+      APPLE_CLIENT_ID: ci.example.app
+      GOOGLE_CLIENT_IDS: ci-google-client.apps.googleusercontent.com
     ports: ["8080:8080"]
     depends_on: { migrate: { condition: service_completed_successfully } }

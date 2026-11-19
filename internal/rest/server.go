@@ -1,6 +1,6 @@
 // Package rest implements the generated OpenAPI server interface.
 // One file per concern: server.go (wiring), middleware.go, ratelimit.go, authmw.go, errors.go,
-// request.go, convert.go, then one file per API domain (health.go, auth.go, email.go, account.go, me.go, ...).
+// request.go, convert.go, then one file per API domain (health.go, auth.go, social.go, email.go, account.go, devices.go, me.go, ...).
 package rest
 
 import (
@@ -50,6 +50,15 @@ type AccountService interface {
 	Delete(ctx context.Context, userID uuid.UUID, password string) error
 }
 
+type SocialService interface {
+	SignIn(ctx context.Context, in service.SocialInput) (service.Session, error)
+}
+
+type DeviceService interface {
+	Register(ctx context.Context, userID, deviceID uuid.UUID, fcmToken string, platform service.Platform) error
+	Remove(ctx context.Context, userID, deviceID uuid.UUID) error
+}
+
 // AccessTokenParser validates a bearer token and returns the user it was issued to.
 type AccessTokenParser interface {
 	Parse(token string) (uuid.UUID, error)
@@ -63,6 +72,8 @@ type Deps struct {
 	Verification VerificationService
 	Reset        PasswordResetService
 	Account      AccountService
+	Social       SocialService
+	Devices      DeviceService
 	Profile      ProfileService
 	Tokens       AccessTokenParser
 	Limits       Limits
@@ -77,6 +88,8 @@ type Server struct {
 	verification VerificationService
 	reset        PasswordResetService
 	account      AccountService
+	social       SocialService
+	devices      DeviceService
 	profile      ProfileService
 	tokens       AccessTokenParser
 	log          *zap.Logger
@@ -98,7 +111,7 @@ func NewServer(d Deps) (*Server, error) {
 	}
 	return &Server{
 		db: d.DB, auth: d.Auth, verification: d.Verification, reset: d.Reset, account: d.Account,
-		profile: d.Profile, tokens: d.Tokens, log: d.Log, now: now,
+		social: d.Social, devices: d.Devices, profile: d.Profile, tokens: d.Tokens, log: d.Log, now: now,
 		secured:    secured,
 		globalRate: newIPLimiters(d.Limits.Global),
 		authRate:   newIPLimiters(d.Limits.Auth),

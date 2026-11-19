@@ -96,7 +96,7 @@ func (s *AuthService) Register(ctx context.Context, in RegisterInput) (Session, 
 	if err != nil {
 		return Session{}, err
 	}
-	user, err := s.Users.Create(ctx, email, &hash, name, tz)
+	user, err := s.Users.Create(ctx, NewUser{Email: email, PasswordHash: &hash, DisplayName: name, Timezone: tz})
 	if errors.Is(err, ErrEmailTaken) {
 		return Session{}, apperr.New(apperr.Conflict, "email already registered")
 	}

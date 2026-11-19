@@ -14,9 +14,10 @@ type Users struct{ q *sqlc.Queries }
 
 func NewUsers(db sqlc.DBTX) *Users { return &Users{q: sqlc.New(db)} }
 
-func (r *Users) Create(ctx context.Context, email string, passwordHash *string, displayName, timezone string) (service.User, error) {
+func (r *Users) Create(ctx context.Context, n service.NewUser) (service.User, error) {
 	row, err := r.q.CreateUser(ctx, sqlc.CreateUserParams{
-		Email: email, PasswordHash: text(passwordHash), DisplayName: displayName, Timezone: timezone,
+		Email: n.Email, PasswordHash: text(n.PasswordHash), EmailVerifiedAt: n.EmailVerifiedAt,
+		DisplayName: n.DisplayName, Timezone: n.Timezone,
 	})
 	if isUniqueViolation(err, "users_email_key") {
 		return service.User{}, service.ErrEmailTaken
@@ -55,6 +56,10 @@ func (r *Users) UpdateProfile(ctx context.Context, id uuid.UUID, displayName, ti
 
 func (r *Users) SetPassword(ctx context.Context, id uuid.UUID, passwordHash string, now time.Time) error {
 	return affected(r.q.SetUserPassword(ctx, sqlc.SetUserPasswordParams{ID: id, PasswordHash: passwordHash, Now: now}))
+}
+
+func (r *Users) ClearPassword(ctx context.Context, id uuid.UUID, now time.Time) error {
+	return affected(r.q.ClearUserPassword(ctx, sqlc.ClearUserPasswordParams{ID: id, Now: now}))
 }
 
 func (r *Users) MarkEmailVerified(ctx context.Context, id uuid.UUID, now time.Time) error {

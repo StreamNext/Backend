@@ -1,0 +1,23 @@
+meta {
+  name: Registering without a token is a 401
+  type: http
+  seq: 6
+}
+
+put {
+  url: {{baseUrl}}/v1/devices/{{deviceId}}
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "fcmToken": "t",
+    "platform": "ios"
+  }
+}
+
+assert {
+  res.status: eq 401
+  res.body.code: eq unauthenticated
+}

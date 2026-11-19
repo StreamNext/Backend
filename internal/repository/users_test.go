@@ -16,7 +16,7 @@ func TestUsersCreateAndGet(t *testing.T) {
 	reset(t)
 	ctx, repo := context.Background(), NewUsers(testPool)
 	pw := "phc-string"
-	created, err := repo.Create(ctx, "ana@example.com", &pw, "Ana", "America/Bogota")
+	created, err := repo.Create(ctx, service.NewUser{Email: "ana@example.com", PasswordHash: &pw, DisplayName: "Ana", Timezone: "America/Bogota"})
 	require.NoError(t, err)
 	assert.NotEqual(t, uuid.Nil, created.ID, "the database assigns the id")
 	require.NotNil(t, created.PasswordHash)
@@ -34,7 +34,7 @@ func TestUsersCreateAndGet(t *testing.T) {
 
 func TestUsersSocialOnlyAccountHasNoPasswordHash(t *testing.T) {
 	reset(t)
-	u, err := NewUsers(testPool).Create(context.Background(), "social@example.com", nil, "S", "UTC")
+	u, err := NewUsers(testPool).Create(context.Background(), service.NewUser{Email: "social@example.com", DisplayName: "S", Timezone: "UTC"})
 	require.NoError(t, err)
 	assert.Nil(t, u.PasswordHash)
 }
@@ -42,7 +42,7 @@ func TestUsersSocialOnlyAccountHasNoPasswordHash(t *testing.T) {
 func TestUsersDuplicateEmailIgnoresCase(t *testing.T) {
 	reset(t)
 	newUser(t, "ana@example.com")
-	_, err := NewUsers(testPool).Create(context.Background(), "ANA@EXAMPLE.COM", nil, "Other", "UTC")
+	_, err := NewUsers(testPool).Create(context.Background(), service.NewUser{Email: "ANA@EXAMPLE.COM", DisplayName: "Other", Timezone: "UTC"})
 	assert.ErrorIs(t, err, service.ErrEmailTaken)
 }
 
@@ -80,7 +80,7 @@ func TestUsersErrorsPassThrough(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // every call now fails with a context error, which is not "not found"
 	repo := NewUsers(testPool)
-	_, err := repo.Create(ctx, "x@y.co", nil, "X", "UTC")
+	_, err := repo.Create(ctx, service.NewUser{Email: "x@y.co", DisplayName: "X", Timezone: "UTC"})
 	assert.Error(t, err)
 	assert.NotErrorIs(t, err, service.ErrEmailTaken)
 	_, err = repo.GetByID(ctx, uuid.New())
@@ -141,4 +141,28 @@ func TestUsersDeleteTakesEverythingOfTheUserWithIt(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.ErrorIs(t, repo.Delete(ctx, gone.ID), service.ErrNotFound, "deleting twice")
+}
+
+func TestUsersCreateCanStartVerified(t *testing.T) {
+	reset(t)
+	repo := NewUsers(testPool)
+	verifiedAt := now
+	u, err := repo.Create(context.Background(), service.NewUser{Email: "v@example.com", EmailVerifiedAt: &verifiedAt, DisplayName: "V", Timezone: "UTC"})
+	require.NoError(t, err)
+	require.NotNil(t, u.EmailVerifiedAt)
+	assert.True(t, u.EmailVerifiedAt.Equal(now))
+}
+
+func TestUsersClearPassword(t *testing.T) {
+	reset(t)
+	ctx, repo := context.Background(), NewUsers(testPool)
+	u := newUser(t, "ana@example.com")
+	require.NotNil(t, u.PasswordHash)
+
+	require.NoError(t, repo.ClearPassword(ctx, u.ID, now))
+	got, _ := repo.GetByID(ctx, u.ID)
+	assert.Nil(t, got.PasswordHash)
+	require.NoError(t, repo.ClearPassword(ctx, u.ID, now), "clearing twice is fine")
+
+	assert.ErrorIs(t, repo.ClearPassword(ctx, uuid.New(), now), service.ErrNotFound)
 }

@@ -31,15 +31,15 @@ func NewPasswordReset(d PasswordResetDeps) *PasswordReset {
 }
 
 // Request emails a reset link. Like Resend, it answers the same way whether or not the address has an
-// account. Accounts without a password (Apple/Google sign-in) get nothing: adding a first password to them
-// is a decision for the social sign-in slice.
+// account. Accounts without a password (Apple/Google sign-in) get one too: the email proves ownership, and
+// resetting is how such an account sets a first password.
 func (p *PasswordReset) Request(ctx context.Context, email string) error {
 	email, err := normalizeEmail(email)
 	if err != nil {
 		return err
 	}
 	u, err := p.Users.GetByEmail(ctx, email)
-	if errors.Is(err, ErrNotFound) || (err == nil && u.PasswordHash == nil) {
+	if errors.Is(err, ErrNotFound) {
 		return nil
 	}
 	if err != nil {

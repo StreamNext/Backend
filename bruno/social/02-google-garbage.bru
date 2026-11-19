@@ -1,0 +1,23 @@
+meta {
+  name: Google with a garbage token
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/v1/auth/google
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "idToken": "not.a.token",
+    "deviceId": "{{deviceId}}"
+  }
+}
+
+assert {
+  res.status: eq 401
+  res.body.code: eq unauthenticated
+}

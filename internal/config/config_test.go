@@ -15,7 +15,7 @@ func setEnv(t *testing.T, overrides map[string]string) {
 	t.Helper()
 	base := map[string]string{
 		"PORT": "", "DATABASE_URL": "postgres://x", "JWT_SECRET": goodSecret, "REFRESH_GRACE_SECONDS": "",
-		"ENV": "", "APP_BASE_URL": "", "MAIL_PROVIDER": "", "MAIL_FROM": "", "RESEND_API_KEY": "",
+		"ENV": "", "APP_BASE_URL": "", "MAIL_PROVIDER": "", "MAIL_FROM": "", "RESEND_API_KEY": "", "APPLE_CLIENT_ID": "", "GOOGLE_CLIENT_IDS": "",
 	}
 	for k, v := range overrides {
 		base[k] = v
@@ -36,6 +36,15 @@ func TestLoadDefaults(t *testing.T) {
 	assert.Equal(t, "dev", c.Env)
 	assert.Equal(t, "http://localhost:3000", c.AppBaseURL)
 	assert.Equal(t, "log", c.Mail.Provider)
+	assert.Equal(t, SocialConfig{}, c.Social, "no provider is enabled unless its client id is set")
+}
+
+func TestLoadSocialProviders(t *testing.T) {
+	setEnv(t, map[string]string{"APPLE_CLIENT_ID": " app.streamnext.ios ", "GOOGLE_CLIENT_IDS": "ios-id.apps.googleusercontent.com, android-id ,, web-id,"})
+	c, err := Load()
+	require.NoError(t, err)
+	assert.Equal(t, "app.streamnext.ios", c.Social.AppleClientID)
+	assert.Equal(t, []string{"ios-id.apps.googleusercontent.com", "android-id", "web-id"}, c.Social.GoogleClientIDs, "spaces and empty entries are dropped")
 }
 
 func TestLoadOverrides(t *testing.T) {

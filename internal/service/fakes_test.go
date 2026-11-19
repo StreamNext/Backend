@@ -25,20 +25,27 @@ type failures map[string]error
 type fakeUsers struct {
 	byID map[uuid.UUID]User
 	fail failures
+	// beforeCreate runs once at the start of Create, to simulate a concurrent request winning a race.
+	beforeCreate func()
 }
 
 func newFakeUsers() *fakeUsers { return &fakeUsers{byID: map[uuid.UUID]User{}, fail: failures{}} }
 
-func (f *fakeUsers) Create(_ context.Context, email string, hash *string, name, tz string) (User, error) {
+func (f *fakeUsers) Create(_ context.Context, n NewUser) (User, error) {
+	if f.beforeCreate != nil {
+		hook := f.beforeCreate
+		f.beforeCreate = nil
+		hook()
+	}
 	if err := f.fail["Create"]; err != nil {
 		return User{}, err
 	}
 	for _, u := range f.byID {
-		if strings.EqualFold(u.Email, email) {
+		if strings.EqualFold(u.Email, n.Email) {
 			return User{}, ErrEmailTaken
 		}
 	}
-	u := User{ID: uuid.New(), Email: email, PasswordHash: hash, DisplayName: name, Timezone: tz}
+	u := User{ID: uuid.New(), Email: n.Email, PasswordHash: n.PasswordHash, EmailVerifiedAt: n.EmailVerifiedAt, DisplayName: n.DisplayName, Timezone: n.Timezone}
 	f.byID[u.ID] = u
 	return u, nil
 }
@@ -228,6 +235,19 @@ func (f *fakeUsers) SetPassword(_ context.Context, id uuid.UUID, hash string, _ 
 	return nil
 }
 
+func (f *fakeUsers) ClearPassword(_ context.Context, id uuid.UUID, _ time.Time) error {
+	if err := f.fail["ClearPassword"]; err != nil {
+		return err
+	}
+	u, ok := f.byID[id]
+	if !ok {
+		return ErrNotFound
+	}
+	u.PasswordHash = nil
+	f.byID[id] = u
+	return nil
+}
+
 func (f *fakeUsers) MarkEmailVerified(_ context.Context, id uuid.UUID, now time.Time) error {
 	if err := f.fail["MarkEmailVerified"]; err != nil {
 		return err
@@ -341,3 +361,104 @@ func (m *fakeMailer) SendPasswordReset(_ context.Context, to, name, link string)
 }
 
 func (m *fakeMailer) last() sentMail { return m.sent[len(m.sent)-1] }
+
+// --- oauth identities and devices ----------------------------------------------------------
+
+type identityKey struct {
+	provider Provider
+	subject  string
+}
+
+type fakeOAuth struct {
+	links map[identityKey]uuid.UUID
+	fail  failures
+}
+
+func newFakeOAuth() *fakeOAuth {
+	return &fakeOAuth{links: map[identityKey]uuid.UUID{}, fail: failures{}}
+}
+
+func (f *fakeOAuth) FindUser(_ context.Context, p Provider, subject string) (uuid.UUID, error) {
+	if err := f.fail["FindUser"]; err != nil {
+		return uuid.Nil, err
+	}
+	id, ok := f.links[identityKey{p, subject}]
+	if !ok {
+		return uuid.Nil, ErrNotFound
+	}
+	return id, nil
+}
+
+func (f *fakeOAuth) Link(_ context.Context, userID uuid.UUID, id Identity, _ time.Time) error {
+	if err := f.fail["Link"]; err != nil {
+		return err
+	}
+	k := identityKey{id.Provider, id.Subject}
+	if _, taken := f.links[k]; taken {
+		return ErrIdentityTaken
+	}
+	f.links[k] = userID
+	return nil
+}
+
+// fakeVerifier returns a fixed identity (or error) and records what it was asked to verify.
+type fakeVerifier struct {
+	identity           Identity
+	err                error
+	gotToken, gotNonce string
+	gotProvider        Provider
+}
+
+func (v *fakeVerifier) Verify(_ context.Context, p Provider, token, nonce string) (Identity, error) {
+	v.gotProvider, v.gotToken, v.gotNonce = p, token, nonce
+	if v.err != nil {
+		return Identity{}, v.err
+	}
+	id := v.identity
+	id.Provider = p
+	return id, nil
+}
+
+// fakeDevices mirrors the Postgres rules: a token has one owner, and a (user, device) pair one row.
+type fakeDevices struct {
+	rows []Device
+	fail failures
+	gone bool // simulate the user having been deleted
+}
+
+func newFakeDevices() *fakeDevices { return &fakeDevices{fail: failures{}} }
+
+func (f *fakeDevices) Upsert(_ context.Context, d Device, _ time.Time) error {
+	if err := f.fail["Upsert"]; err != nil {
+		return err
+	}
+	if f.gone {
+		return ErrNotFound
+	}
+	kept := f.rows[:0:0]
+	for _, r := range f.rows {
+		sameDevice := r.UserID == d.UserID && r.DeviceID == d.DeviceID
+		if r.FCMToken == d.FCMToken && !sameDevice {
+			continue // the token moves to its new owner
+		}
+		if !sameDevice {
+			kept = append(kept, r)
+		}
+	}
+	f.rows = append(kept, d)
+	return nil
+}
+
+func (f *fakeDevices) Delete(_ context.Context, userID, deviceID uuid.UUID) error {
+	if err := f.fail["Delete"]; err != nil {
+		return err
+	}
+	kept := f.rows[:0:0]
+	for _, r := range f.rows {
+		if !(r.UserID == userID && r.DeviceID == deviceID) {
+			kept = append(kept, r)
+		}
+	}
+	f.rows = kept
+	return nil
+}

@@ -11,6 +11,16 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Device struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	DeviceID  uuid.UUID
+	FcmToken  string
+	Platform  string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 type EmailToken struct {
 	ID         uuid.UUID
 	UserID     uuid.UUID
@@ -19,6 +29,15 @@ type EmailToken struct {
 	ExpiresAt  time.Time
 	CreatedAt  time.Time
 	ConsumedAt *time.Time
+}
+
+type OauthAccount struct {
+	ID        uuid.UUID
+	UserID    uuid.UUID
+	Provider  string
+	Subject   string
+	Email     pgtype.Text
+	CreatedAt time.Time
 }
 
 type RefreshToken struct {

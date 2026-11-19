@@ -29,7 +29,7 @@ type Limits struct {
 func DefaultLimits() Limits {
 	return Limits{
 		Global: LimitRule{Rate: 10, Burst: 60},
-		Auth:   LimitRule{Rate: 0.5, Burst: 30}, // 30 attempts a minute, after an initial burst of 30
+		Auth:   LimitRule{Rate: 0.5, Burst: 40}, // 30 attempts a minute, after an initial burst of 40
 	}
 }
 

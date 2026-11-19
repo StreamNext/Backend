@@ -54,7 +54,7 @@ func reset(t *testing.T) {
 func newUser(t *testing.T, email string) service.User {
 	t.Helper()
 	pw := "hash"
-	u, err := NewUsers(testPool).Create(context.Background(), email, &pw, "Ana", "UTC")
+	u, err := NewUsers(testPool).Create(context.Background(), service.NewUser{Email: email, PasswordHash: &pw, DisplayName: "Ana", Timezone: "UTC"})
 	require.NoError(t, err)
 	return u
 }

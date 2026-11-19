@@ -1,0 +1,25 @@
+meta {
+  name: Apple with a garbage token
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/v1/auth/apple
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "identityToken": "not.a.token",
+    "nonce": "n",
+    "deviceId": "{{deviceId}}"
+  }
+}
+
+assert {
+  res.status: eq 401
+  res.body.code: eq unauthenticated
+  res.body.message: eq invalid sign-in token
+}

@@ -35,6 +35,11 @@ func isUniqueViolation(err error, constraint string) bool {
 	return errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == constraint
 }
 
+func isForeignKeyViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23503"
+}
+
 func text(s *string) pgtype.Text {
 	if s == nil {
 		return pgtype.Text{}
