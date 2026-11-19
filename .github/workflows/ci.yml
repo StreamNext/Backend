@@ -1,0 +1,24 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [develop, main]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Backend
+    steps:
+      - uses: actions/checkout@v4
+        with: { path: Backend }
+      # The contract lives in the (public) Proto repo; Makefile expects it at ../Proto.
+      - uses: actions/checkout@v4
+        with: { repository: StreamNext/Proto, path: Proto }
+      - uses: actions/setup-go@v5
+        with: { go-version-file: Backend/go.mod }
+      - run: make generate && test -z "$(gofmt -l .)"
+      - name: Unit + Postgres tests, 90% coverage gate
+        run: make test
+      - name: Bruno integration suite
+        run: make bruno

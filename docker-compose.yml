@@ -1,0 +1,21 @@
+# Postgres + migrations + API, for local runs and the Bruno suite (CI uses the same file).
+services:
+  db:
+    image: postgres:16-alpine
+    environment: { POSTGRES_USER: u, POSTGRES_PASSWORD: p, POSTGRES_DB: streamnext }
+    ports: ["5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U u -d streamnext"]
+      interval: 2s
+      retries: 30
+  migrate:
+    build: .
+    entrypoint: ["/app/migrate"]
+    environment: &env
+      DATABASE_URL: postgres://u:p@db:5432/streamnext?sslmode=disable
+    depends_on: { db: { condition: service_healthy } }
+  api:
+    build: .
+    environment: *env
+    ports: ["8080:8080"]
+    depends_on: { migrate: { condition: service_completed_successfully } }
