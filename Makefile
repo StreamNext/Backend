@@ -3,12 +3,18 @@ SPEC ?= ../Proto/openapi/v1/streamnext.yaml
 ENV  ?= dev
 BRU  := npx --yes @usebruno/cli@2.3.0
 
+# StreamNext's own age key. sops only looks at keys.txt (WellSpent's key) by default, so point it
+# here for every make target. Override with AGE_KEY_FILE=...; CI (no such file) supplies SOPS_AGE_KEY.
+AGE_KEY_FILE ?= $(HOME)/Library/Application Support/sops/age/streamnext.txt
+ifeq ($(shell test -f "$(AGE_KEY_FILE)" && echo yes),yes)
+export SOPS_AGE_KEY_FILE := $(AGE_KEY_FILE)
+endif
+
 .PHONY: generate run migrate test bruno secrets-encrypt secrets-decrypt
 
 generate:
 	go tool oapi-codegen -config oapi-codegen.yaml $(SPEC)
 
-# sops reads the age key from SOPS_AGE_KEY_FILE (see CLAUDE.md).
 run:
 	sops exec-env $(ENV).enc.env 'go run ./cmd/server'
 
@@ -28,7 +34,7 @@ bruno: generate
 	cd bruno && $(BRU) run --env ci; s=$$?; cd .. && docker compose down -v; exit $$s
 
 secrets-decrypt:
-	sops decrypt $(ENV).enc.env > $(ENV).env
+	sops decrypt --output $(ENV).env $(ENV).enc.env
 
 secrets-encrypt:
-	sops encrypt --filename-override $(ENV).enc.env $(ENV).env > $(ENV).enc.env.tmp && mv $(ENV).enc.env.tmp $(ENV).enc.env
+	sops encrypt --filename-override $(ENV).enc.env --output $(ENV).enc.env $(ENV).env

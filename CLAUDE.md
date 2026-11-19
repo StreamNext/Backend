@@ -15,7 +15,7 @@ Go REST + JWT API for StreamNext. Read `../CLAUDE.md` and `../docs/specs/02-arch
 | `make secrets-decrypt` / `secrets-encrypt` | edit `<env>.env` (gitignored), re-encrypt to `<env>.enc.env` |
 
 ## Secrets (sops + age)
-Encrypted files are `dev.enc.env` / `prod.enc.env` (the `.env` suffix is needed for sops to detect the format). The StreamNext age key is `~/Library/Application Support/sops/age/streamnext.txt` — **not** WellSpent's `keys.txt`. Export `SOPS_AGE_KEY_FILE` to that path. CI uses the `SOPS_AGE_KEY` secret.
+Encrypted files are `dev.enc.env` / `prod.enc.env` (the `.env` suffix is needed for sops to detect the format). The StreamNext age key is `~/Library/Application Support/sops/age/streamnext.txt` — **not** WellSpent's `keys.txt`. The Makefile points sops at it automatically (override with `AGE_KEY_FILE=...`). When you run `sops` directly, export `SOPS_AGE_KEY_FILE` to that path first, otherwise sops tries WellSpent's `keys.txt` and fails with "no master key was able to decrypt". CI uses the `SOPS_AGE_KEY` secret.
 
 ## Layer order for a feature
 Contract (Proto) → `make generate` → migration + sqlc query → repository (interface) → service (unit tests with mocked repos) → REST handler (httptest) → Bruno requests. `sqlc.yaml` is configured but `sqlc generate` needs at least one query; add it with the first real query (M1) and wire it into `make generate`.

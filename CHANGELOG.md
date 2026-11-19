@@ -3,6 +3,10 @@
 Semver. Minor = new feature/endpoint, patch = fix, major = breaking contract change.
 The version is `internal/version/version.go`. Backend and Proto versions are independent; an entry says when it implements a new Proto version.
 
+## 0.1.2 — 2026-11-19
+- Makefile points sops at StreamNext's own age key automatically (`AGE_KEY_FILE`), so `make secrets-*`, `run` and `migrate` work in a fresh shell.
+- `secrets-decrypt`/`encrypt` write with `--output`, so a failed run can no longer truncate an existing `dev.env`.
+
 ## 0.1.1 — 2026-11-19
 - Unknown routes and wrong methods now return the JSON `{code,message}` error (404 `not_found` / 405 `method_not_allowed` with `Allow`) instead of Go's plain text.
 - Split `internal/rest` into one file per concern (no behaviour change).
