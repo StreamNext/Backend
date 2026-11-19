@@ -21,6 +21,7 @@ func TestKindMapping(t *testing.T) {
 		{InvalidArgument, http.StatusBadRequest, "invalid_argument"},
 		{Unauthenticated, http.StatusUnauthorized, "unauthenticated"},
 		{Unavailable, http.StatusServiceUnavailable, "unavailable"},
+		{MethodNotAllowed, http.StatusMethodNotAllowed, "method_not_allowed"},
 		{Internal, http.StatusInternalServerError, "internal"},
 	}
 	for _, c := range cases {

@@ -16,6 +16,7 @@ const (
 	InvalidArgument
 	Unauthenticated
 	Unavailable
+	MethodNotAllowed
 )
 
 // Error carries a Kind and a client-safe message.
@@ -53,6 +54,8 @@ func (k Kind) Status() int {
 		return http.StatusUnauthorized
 	case Unavailable:
 		return http.StatusServiceUnavailable
+	case MethodNotAllowed:
+		return http.StatusMethodNotAllowed
 	default:
 		return http.StatusInternalServerError
 	}
@@ -73,6 +76,8 @@ func (k Kind) Code() string {
 		return "unauthenticated"
 	case Unavailable:
 		return "unavailable"
+	case MethodNotAllowed:
+		return "method_not_allowed"
 	default:
 		return "internal"
 	}

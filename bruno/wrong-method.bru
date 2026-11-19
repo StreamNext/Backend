@@ -1,0 +1,17 @@
+meta {
+  name: Wrong method returns JSON 405
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/v1/health
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 405
+  res.headers['allow']: eq GET
+  res.body.code: eq method_not_allowed
+}
