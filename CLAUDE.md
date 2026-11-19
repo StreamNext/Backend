@@ -24,6 +24,8 @@ Contract (Proto) → `make generate` → migration + sqlc query → repository (
 - Errors: return `*apperr.Error`; `rest.writeError` is the only place that maps them to HTTP. Untyped errors become a generic 500 — never leak internals.
 - Every process sets its own `application_name`. Neon: **direct** URL, not the pooler.
 - Log with IDs via zap; never swallow an error.
+- Readability first: one concern per file, named for what it holds (`errors.go`, `middleware.go`, `auth.go`; never `utils.go`). Split a file when it mixes concerns or stops fitting in your head (roughly 200–400 lines). `*rest.Server` methods are spread across one file per domain. Add a package only for a real boundary (e.g. `tvdb`, `service`), not per feature.
+- Comment the why, not the what. When using a Go idiom that isn't obvious (implicit interfaces, embedding, generated wiring), say so briefly in the PR/summary: the maintainer is still learning Go.
 - Tests must assert behaviour, not just compile. Keep `cmd/` thin (it is outside the coverage gate).
 
 ## Versioning & git
