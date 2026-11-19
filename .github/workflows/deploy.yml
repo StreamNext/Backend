@@ -1,10 +1,9 @@
-# Untested until the GCP project + Workload Identity Federation exist.
+# DISABLED for now: manual trigger only until the GCP deployment is signed off. Untested.
+# To enable, add back `push: branches: [main]` under `on:`.
 # Needs repo variables: GCP_PROJECT, GCP_WIF_PROVIDER, GCP_SERVICE_ACCOUNT;
 # Artifact Registry repo `streamnext`; Secret Manager secret `streamnext-database-url` (Neon direct URL).
 name: Deploy
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
