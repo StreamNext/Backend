@@ -22,7 +22,7 @@ func NewRefreshTokens(pool *pgxpool.Pool) *RefreshTokens {
 
 // Issue revokes the device's live token and stores the new one in one transaction.
 func (r *RefreshTokens) Issue(ctx context.Context, t service.NewToken, now time.Time) error {
-	return r.inTx(ctx, func(q *sqlc.Queries) error {
+	return inTx(ctx, r.pool, r.q, func(q *sqlc.Queries) error {
 		if err := q.RevokeActiveDeviceTokens(ctx, sqlc.RevokeActiveDeviceTokensParams{UserID: t.UserID, DeviceID: t.DeviceID, RevokedAt: &now}); err != nil {
 			return err
 		}
@@ -52,7 +52,7 @@ func (r *RefreshTokens) GetByID(ctx context.Context, id uuid.UUID) (service.Refr
 // The old row must be revoked before the insert, or the one-live-token-per-device index would reject it.
 func (r *RefreshTokens) Rotate(ctx context.Context, oldID uuid.UUID, next service.NewToken, now time.Time) (bool, error) {
 	rotated := false
-	err := r.inTx(ctx, func(q *sqlc.Queries) error {
+	err := inTx(ctx, r.pool, r.q, func(q *sqlc.Queries) error {
 		n, err := q.RevokeTokenIfActive(ctx, sqlc.RevokeTokenIfActiveParams{ID: oldID, RevokedAt: &now})
 		if err != nil || n == 0 {
 			return err // n == 0: not live any more; the transaction rolls back with nothing changed
@@ -77,19 +77,6 @@ func (r *RefreshTokens) Revoke(ctx context.Context, id uuid.UUID, now time.Time)
 
 func (r *RefreshTokens) RevokeAllForUser(ctx context.Context, userID uuid.UUID, now time.Time) error {
 	return r.q.RevokeAllUserTokens(ctx, sqlc.RevokeAllUserTokensParams{UserID: userID, RevokedAt: &now})
-}
-
-// inTx runs fn in a transaction: committed if it returns nil, rolled back otherwise.
-func (r *RefreshTokens) inTx(ctx context.Context, fn func(*sqlc.Queries) error) error {
-	tx, err := r.pool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback(ctx) }() // no-op after a successful Commit
-	if err := fn(r.q.WithTx(tx)); err != nil {
-		return err
-	}
-	return tx.Commit(ctx)
 }
 
 func insertParams(t service.NewToken, now time.Time) sqlc.InsertRefreshTokenParams {

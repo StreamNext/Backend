@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -127,4 +128,42 @@ func TestDefaultLimitsAreEnabled(t *testing.T) {
 	assert.NotZero(t, d.Global.Burst)
 	assert.NotZero(t, d.Auth.Burst)
 	assert.Less(t, float64(d.Auth.Rate), float64(d.Global.Rate), "auth endpoints are stricter")
+}
+
+func TestStrictLimitCoversEndpointsThatCheckOrTriggerThings(t *testing.T) {
+	cases := []struct {
+		method, path string
+		strict       bool
+	}{
+		{http.MethodPost, "/v1/auth/login", true},
+		{http.MethodPost, "/v1/auth/forgot-password", true},
+		{http.MethodPost, "/v1/me/change-password", true},
+		{http.MethodDelete, "/v1/me", true},
+		{http.MethodGet, "/v1/me", false},
+		{http.MethodPatch, "/v1/me", false},
+		{http.MethodGet, "/v1/health", false},
+	}
+	for _, c := range cases {
+		r := httptest.NewRequest(c.method, c.path, nil)
+		assert.Equal(t, c.strict, isStrict(r), "%s %s", c.method, c.path)
+	}
+}
+
+func TestPasswordCheckingEndpointsShareTheStrictBudget(t *testing.T) {
+	now := epochTime
+	h := at(t, &now, Limits{Auth: LimitRule{Rate: 0.1, Burst: 2}})
+	call := func(method, path, body string) int {
+		req := httptest.NewRequest(method, path, strings.NewReader(body))
+		req.Header.Set("Authorization", "Bearer good-token")
+		req.RemoteAddr = "198.51.100.1:4000"
+		rec := httptest.NewRecorder()
+		h.handler.ServeHTTP(rec, req)
+		return rec.Code
+	}
+	changeBody := `{"currentPassword":"x","newPassword":"a-brand-new-pass","deviceId":"` + devID + `"}`
+
+	assert.Equal(t, http.StatusOK, call(http.MethodPost, "/v1/me/change-password", changeBody))
+	assert.Equal(t, http.StatusNoContent, call(http.MethodDelete, "/v1/me", ""))
+	assert.Equal(t, http.StatusTooManyRequests, call(http.MethodPost, "/v1/me/change-password", changeBody), "a stolen token can't guess the current password at will")
+	assert.Equal(t, http.StatusOK, call(http.MethodGet, "/v1/me", ""), "reading the profile is not limited by it")
 }

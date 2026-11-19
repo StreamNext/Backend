@@ -1,6 +1,6 @@
 // Package rest implements the generated OpenAPI server interface.
 // One file per concern: server.go (wiring), middleware.go, ratelimit.go, authmw.go, errors.go,
-// request.go, convert.go, then one file per API domain (health.go, auth.go, me.go, ...).
+// request.go, convert.go, then one file per API domain (health.go, auth.go, email.go, account.go, me.go, ...).
 package rest
 
 import (
@@ -35,6 +35,21 @@ type ProfileService interface {
 	Update(ctx context.Context, id uuid.UUID, in service.UpdateProfileInput) (service.User, error)
 }
 
+type VerificationService interface {
+	Resend(ctx context.Context, email string) error
+	Confirm(ctx context.Context, token string) error
+}
+
+type PasswordResetService interface {
+	Request(ctx context.Context, email string) error
+	Reset(ctx context.Context, token, newPassword string) error
+}
+
+type AccountService interface {
+	ChangePassword(ctx context.Context, userID uuid.UUID, in service.ChangePasswordInput) (service.Session, error)
+	Delete(ctx context.Context, userID uuid.UUID, password string) error
+}
+
 // AccessTokenParser validates a bearer token and returns the user it was issued to.
 type AccessTokenParser interface {
 	Parse(token string) (uuid.UUID, error)
@@ -43,23 +58,29 @@ type AccessTokenParser interface {
 // Deps are everything a Server needs. Limits left at the zero value disable rate limiting;
 // Now defaults to time.Now.
 type Deps struct {
-	DB      Pinger
-	Auth    AuthService
-	Profile ProfileService
-	Tokens  AccessTokenParser
-	Limits  Limits
-	Now     func() time.Time
-	Log     *zap.Logger
+	DB           Pinger
+	Auth         AuthService
+	Verification VerificationService
+	Reset        PasswordResetService
+	Account      AccountService
+	Profile      ProfileService
+	Tokens       AccessTokenParser
+	Limits       Limits
+	Now          func() time.Time
+	Log          *zap.Logger
 }
 
 // Server implements api.ServerInterface; its endpoint methods live in one file per domain.
 type Server struct {
-	db      Pinger
-	auth    AuthService
-	profile ProfileService
-	tokens  AccessTokenParser
-	log     *zap.Logger
-	now     func() time.Time
+	db           Pinger
+	auth         AuthService
+	verification VerificationService
+	reset        PasswordResetService
+	account      AccountService
+	profile      ProfileService
+	tokens       AccessTokenParser
+	log          *zap.Logger
+	now          func() time.Time
 
 	secured    map[string]bool // route patterns (e.g. "GET /v1/me") the contract protects with a bearer token
 	globalRate *ipLimiters
@@ -76,7 +97,8 @@ func NewServer(d Deps) (*Server, error) {
 		now = time.Now
 	}
 	return &Server{
-		db: d.DB, auth: d.Auth, profile: d.Profile, tokens: d.Tokens, log: d.Log, now: now,
+		db: d.DB, auth: d.Auth, verification: d.Verification, reset: d.Reset, account: d.Account,
+		profile: d.Profile, tokens: d.Tokens, log: d.Log, now: now,
 		secured:    secured,
 		globalRate: newIPLimiters(d.Limits.Global),
 		authRate:   newIPLimiters(d.Limits.Auth),

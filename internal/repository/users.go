@@ -53,6 +53,18 @@ func (r *Users) UpdateProfile(ctx context.Context, id uuid.UUID, displayName, ti
 	return toUser(row), nil
 }
 
+func (r *Users) SetPassword(ctx context.Context, id uuid.UUID, passwordHash string, now time.Time) error {
+	return affected(r.q.SetUserPassword(ctx, sqlc.SetUserPasswordParams{ID: id, PasswordHash: passwordHash, Now: now}))
+}
+
+func (r *Users) MarkEmailVerified(ctx context.Context, id uuid.UUID, now time.Time) error {
+	return affected(r.q.MarkUserEmailVerified(ctx, sqlc.MarkUserEmailVerifiedParams{ID: id, Now: now}))
+}
+
+func (r *Users) Delete(ctx context.Context, id uuid.UUID) error {
+	return affected(r.q.DeleteUser(ctx, id))
+}
+
 func toUser(u sqlc.User) service.User {
 	var hash *string
 	if u.PasswordHash.Valid {

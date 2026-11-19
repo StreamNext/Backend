@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"net/url"
 	"strings"
 	"time"
 
@@ -211,3 +212,132 @@ func (a fakeAccess) Issue(id uuid.UUID) (string, int, error) {
 	}
 	return "access-for-" + id.String(), 900, nil
 }
+
+// --- users: slice 2 additions --------------------------------------------------------------
+
+func (f *fakeUsers) SetPassword(_ context.Context, id uuid.UUID, hash string, _ time.Time) error {
+	if err := f.fail["SetPassword"]; err != nil {
+		return err
+	}
+	u, ok := f.byID[id]
+	if !ok {
+		return ErrNotFound
+	}
+	u.PasswordHash = &hash
+	f.byID[id] = u
+	return nil
+}
+
+func (f *fakeUsers) MarkEmailVerified(_ context.Context, id uuid.UUID, now time.Time) error {
+	if err := f.fail["MarkEmailVerified"]; err != nil {
+		return err
+	}
+	u, ok := f.byID[id]
+	if !ok {
+		return ErrNotFound
+	}
+	if u.EmailVerifiedAt == nil { // idempotent: the first verification time is kept
+		u.EmailVerifiedAt = &now
+	}
+	f.byID[id] = u
+	return nil
+}
+
+func (f *fakeUsers) Delete(_ context.Context, id uuid.UUID) error {
+	if err := f.fail["Delete"]; err != nil {
+		return err
+	}
+	if _, ok := f.byID[id]; !ok {
+		return ErrNotFound
+	}
+	delete(f.byID, id)
+	return nil
+}
+
+// --- email tokens --------------------------------------------------------------------------
+
+type emailTokenRow struct {
+	NewEmailToken
+	createdAt  time.Time
+	consumedAt *time.Time
+}
+
+// fakeEmailTokens mirrors the Postgres repository: a new token supersedes older unused ones of the same
+// purpose, and Consume is single-use and honours expiry and purpose.
+type fakeEmailTokens struct {
+	rows []*emailTokenRow
+	fail failures
+}
+
+func newFakeEmailTokens() *fakeEmailTokens { return &fakeEmailTokens{fail: failures{}} }
+
+func (f *fakeEmailTokens) Replace(_ context.Context, t NewEmailToken, now time.Time) error {
+	if err := f.fail["Replace"]; err != nil {
+		return err
+	}
+	for _, r := range f.rows {
+		if r.UserID == t.UserID && r.Purpose == t.Purpose && r.consumedAt == nil {
+			r.consumedAt = &now
+		}
+	}
+	f.rows = append(f.rows, &emailTokenRow{NewEmailToken: t, createdAt: now})
+	return nil
+}
+
+func (f *fakeEmailTokens) LastCreated(_ context.Context, userID uuid.UUID, purpose EmailPurpose) (time.Time, error) {
+	if err := f.fail["LastCreated"]; err != nil {
+		return time.Time{}, err
+	}
+	var latest time.Time
+	for _, r := range f.rows {
+		if r.UserID == userID && r.Purpose == purpose && r.createdAt.After(latest) {
+			latest = r.createdAt
+		}
+	}
+	if latest.IsZero() {
+		return time.Time{}, ErrNotFound
+	}
+	return latest, nil
+}
+
+func (f *fakeEmailTokens) Consume(_ context.Context, hash string, purpose EmailPurpose, now time.Time) (uuid.UUID, error) {
+	if err := f.fail["Consume"]; err != nil {
+		return uuid.Nil, err
+	}
+	for _, r := range f.rows {
+		if r.TokenHash == hash && r.Purpose == purpose && r.consumedAt == nil && now.Before(r.ExpiresAt) {
+			r.consumedAt = &now
+			return r.UserID, nil
+		}
+	}
+	return uuid.Nil, ErrNotFound
+}
+
+// --- mailer --------------------------------------------------------------------------------
+
+type sentMail struct {
+	kind, to, name, link string
+}
+
+// token is the value of the link's ?token= parameter, as the user would click it.
+func (m sentMail) token() string {
+	u, _ := url.Parse(m.link)
+	return u.Query().Get("token")
+}
+
+type fakeMailer struct {
+	sent []sentMail
+	err  error
+}
+
+func (m *fakeMailer) SendVerification(_ context.Context, to, name, link string) error {
+	m.sent = append(m.sent, sentMail{"verify", to, name, link})
+	return m.err
+}
+
+func (m *fakeMailer) SendPasswordReset(_ context.Context, to, name, link string) error {
+	m.sent = append(m.sent, sentMail{"reset", to, name, link})
+	return m.err
+}
+
+func (m *fakeMailer) last() sentMail { return m.sent[len(m.sent)-1] }

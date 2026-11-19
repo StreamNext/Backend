@@ -16,6 +16,7 @@ import (
 	"github.com/StreamNext/Backend/internal/auth"
 	"github.com/StreamNext/Backend/internal/config"
 	"github.com/StreamNext/Backend/internal/db"
+	"github.com/StreamNext/Backend/internal/mail"
 	"github.com/StreamNext/Backend/internal/repository"
 	"github.com/StreamNext/Backend/internal/rest"
 	"github.com/StreamNext/Backend/internal/service"
@@ -50,14 +51,25 @@ func run(log *zap.Logger) error {
 	users := repository.NewUsers(pool)
 	tokens := repository.NewRefreshTokens(pool)
 	jwt := auth.NewTokenIssuer(cfg.JWTSecret, accessTokenTTL, time.Now)
+	hasher := auth.NewHasher(auth.DefaultPasswordParams)
+	mailer := mail.New(mailTransport(cfg.Mail, log))
 
-	authService := service.NewAuthService(service.AuthDeps{
-		Users: users, Tokens: tokens, Hasher: auth.NewHasher(auth.DefaultPasswordParams), Access: jwt,
-		Grace: cfg.RefreshGrace, Now: time.Now, Log: log,
+	verification := service.NewVerification(service.VerificationDeps{
+		Users: users, Tokens: repository.NewEmailTokens(pool), Mailer: mailer, BaseURL: cfg.AppBaseURL, Now: time.Now, Log: log,
 	})
+	authService := service.NewAuthService(service.AuthDeps{
+		Users: users, Tokens: tokens, Hasher: hasher, Access: jwt,
+		Grace: cfg.RefreshGrace, Now: time.Now, Log: log, Verifier: verification,
+	})
+	passwordReset := service.NewPasswordReset(service.PasswordResetDeps{
+		Users: users, Sessions: tokens, Tokens: repository.NewEmailTokens(pool), Mailer: mailer, Hasher: hasher,
+		BaseURL: cfg.AppBaseURL, Now: time.Now, Log: log,
+	})
+	account := service.NewAccount(service.AccountDeps{Users: users, Sessions: tokens, Hasher: hasher, Auth: authService, Now: time.Now, Log: log})
+
 	api, err := rest.NewServer(rest.Deps{
-		DB: pool, Auth: authService, Profile: service.NewProfileService(users, time.Now),
-		Tokens: jwt, Limits: rest.DefaultLimits(), Log: log,
+		DB: pool, Auth: authService, Verification: verification, Reset: passwordReset, Account: account,
+		Profile: service.NewProfileService(users, time.Now), Tokens: jwt, Limits: rest.DefaultLimits(), Log: log,
 	})
 	if err != nil {
 		return err
@@ -75,4 +87,13 @@ func run(log *zap.Logger) error {
 		return err
 	}
 	return nil
+}
+
+// mailTransport picks how emails leave the process: printed to the log (dev only; config refuses it in
+// prod) or sent through Resend.
+func mailTransport(c config.MailConfig, log *zap.Logger) mail.Transport {
+	if c.Provider == "resend" {
+		return mail.NewResend(c.ResendAPIKey, c.From)
+	}
+	return mail.NewLogTransport(log)
 }

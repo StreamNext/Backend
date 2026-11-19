@@ -47,6 +47,11 @@ type Session struct {
 	User         User
 }
 
+// VerificationSender sends the "verify your email" message to a new account.
+type VerificationSender interface {
+	Send(ctx context.Context, u User) error
+}
+
 type AuthDeps struct {
 	Users  UserRepository
 	Tokens RefreshTokenRepository
@@ -56,6 +61,8 @@ type AuthDeps struct {
 	Grace time.Duration
 	Now   func() time.Time
 	Log   *zap.Logger
+	// Verifier emails new accounts a verification link. Optional: nil sends nothing.
+	Verifier VerificationSender
 }
 
 // AuthService implements register, login, refresh and logout.
@@ -97,6 +104,11 @@ func (s *AuthService) Register(ctx context.Context, in RegisterInput) (Session, 
 		return Session{}, fmt.Errorf("create user: %w", err)
 	}
 	s.Log.Info("user registered", zap.String("user_id", user.ID.String()))
+	if s.Verifier != nil { // a mail failure must never block sign-up: the user can ask for another email
+		if err := s.Verifier.Send(ctx, user); err != nil {
+			s.Log.Error("could not send verification email", zap.String("user_id", user.ID.String()), zap.Error(err))
+		}
+	}
 	return s.startSession(ctx, user, in.DeviceID, lifetime(in.RememberMe))
 }
 
@@ -156,8 +168,8 @@ func (s *AuthService) Refresh(ctx context.Context, in RefreshInput) (Session, er
 	return s.refreshRevoked(ctx, t)
 }
 
-// refreshRevoked handles a token that was already revoked: either a client retrying after a lost
-// response (grace window) or reuse of a stolen token (revoke everything).
+// refreshRevoked handles a token that was already revoked: a client retrying after a lost response (grace
+// window), reuse of a rotated token (revoke everything), or simply a stale token (reject it).
 func (s *AuthService) refreshRevoked(ctx context.Context, t RefreshToken) (Session, error) {
 	now := s.Now()
 	if t.ReplacedBy != nil && t.RevokedAt != nil && now.Sub(*t.RevokedAt) < s.Grace {
@@ -172,6 +184,12 @@ func (s *AuthService) refreshRevoked(ctx context.Context, t RefreshToken) (Sessi
 				return sess, err
 			}
 		}
+	}
+	if t.ReplacedBy == nil {
+		// Revoked by logout, a new login on the device, or a password change/reset, not by rotation. Nobody
+		// holds a second copy of it, so this is a stale client rather than theft: reject it without signing
+		// the user out of the sessions they created since.
+		return Session{}, errInvalidRefresh
 	}
 	s.Log.Warn("refresh token reuse detected, revoking all sessions", zap.String("user_id", t.UserID.String()))
 	if err := s.Tokens.RevokeAllForUser(ctx, t.UserID, now); err != nil {
@@ -227,7 +245,7 @@ func (s *AuthService) startSession(ctx context.Context, user User, deviceID uuid
 }
 
 func (s *AuthService) newGrant(userID, deviceID uuid.UUID, life time.Duration) (string, NewToken, error) {
-	raw, hash, err := auth.NewRefreshToken()
+	raw, hash, err := auth.NewToken()
 	if err != nil {
 		return "", NewToken{}, err
 	}

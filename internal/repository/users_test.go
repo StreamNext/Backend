@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -85,4 +86,59 @@ func TestUsersErrorsPassThrough(t *testing.T) {
 	_, err = repo.GetByID(ctx, uuid.New())
 	assert.Error(t, err)
 	assert.NotErrorIs(t, err, service.ErrNotFound)
+}
+
+func TestUsersSetPassword(t *testing.T) {
+	reset(t)
+	ctx, repo := context.Background(), NewUsers(testPool)
+	u := newUser(t, "ana@example.com")
+
+	require.NoError(t, repo.SetPassword(ctx, u.ID, "new-hash", now))
+	got, _ := repo.GetByID(ctx, u.ID)
+	require.NotNil(t, got.PasswordHash)
+	assert.Equal(t, "new-hash", *got.PasswordHash)
+
+	assert.ErrorIs(t, repo.SetPassword(ctx, uuid.New(), "x", now), service.ErrNotFound)
+}
+
+func TestUsersMarkEmailVerifiedKeepsTheFirstTime(t *testing.T) {
+	reset(t)
+	ctx, repo := context.Background(), NewUsers(testPool)
+	u := newUser(t, "ana@example.com")
+	require.Nil(t, u.EmailVerifiedAt)
+
+	require.NoError(t, repo.MarkEmailVerified(ctx, u.ID, now))
+	require.NoError(t, repo.MarkEmailVerified(ctx, u.ID, now.Add(time.Hour)), "idempotent")
+	got, _ := repo.GetByID(ctx, u.ID)
+	require.NotNil(t, got.EmailVerifiedAt)
+	assert.True(t, got.EmailVerifiedAt.Equal(now), "the first verification time is kept, got %v", got.EmailVerifiedAt)
+
+	assert.ErrorIs(t, repo.MarkEmailVerified(ctx, uuid.New(), now), service.ErrNotFound)
+}
+
+func TestUsersDeleteTakesEverythingOfTheUserWithIt(t *testing.T) {
+	reset(t)
+	ctx, repo := context.Background(), NewUsers(testPool)
+	gone, kept := newUser(t, "gone@example.com"), newUser(t, "kept@example.com")
+	tokens, emails := NewRefreshTokens(testPool), NewEmailTokens(testPool)
+	for _, u := range []service.User{gone, kept} {
+		require.NoError(t, tokens.Issue(ctx, grant(u.ID, phone, "rt-"+u.Email), now))
+		require.NoError(t, emails.Replace(ctx, emailGrant(u.ID, service.PurposeVerify, "et-"+u.Email), now))
+	}
+
+	require.NoError(t, repo.Delete(ctx, gone.ID))
+
+	_, err := repo.GetByID(ctx, gone.ID)
+	assert.ErrorIs(t, err, service.ErrNotFound)
+	_, err = tokens.GetByHash(ctx, "rt-gone@example.com")
+	assert.ErrorIs(t, err, service.ErrNotFound, "refresh tokens cascade")
+	_, err = emails.LastCreated(ctx, gone.ID, service.PurposeVerify)
+	assert.ErrorIs(t, err, service.ErrNotFound, "email tokens cascade")
+
+	_, err = repo.GetByID(ctx, kept.ID)
+	assert.NoError(t, err, "other users are untouched")
+	_, err = tokens.GetByHash(ctx, "rt-kept@example.com")
+	assert.NoError(t, err)
+
+	assert.ErrorIs(t, repo.Delete(ctx, gone.ID), service.ErrNotFound, "deleting twice")
 }

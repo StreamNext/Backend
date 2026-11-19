@@ -3,9 +3,9 @@
 Go REST + JWT API for StreamNext. Read `../CLAUDE.md` and `../docs/specs/02-architecture.md` first. Contract: `../Proto/openapi/v1/streamnext.yaml` (hand-written).
 
 ## Layout
-`cmd/{server,migrate}` · `internal/{apperr,auth,config,db,repository,rest,service,sqlc,testdb,version}` · `gen/api` (gitignored, from the contract) · `internal/sqlc` (generated, **committed**) · `bruno/` · `internal/db/{migrations,query}`
+`cmd/{server,migrate}` · `internal/{apperr,auth,config,db,mail,repository,rest,service,sqlc,testdb,version}` · `gen/api` (gitignored, from the contract) · `internal/sqlc` (generated, **committed**) · `bruno/` · `internal/db/{migrations,query}`
 
-Flow: `rest` (HTTP) → `service` (rules, depends only on interfaces in `service/repositories.go`) → `repository` (sqlc + pgx). `auth` is pure crypto (argon2id, JWT, refresh tokens).
+Flow: `rest` (HTTP) → `service` (rules, depends only on interfaces in `service/repositories.go`) → `repository` (sqlc + pgx). `auth` is pure crypto (argon2id, JWT, opaque tokens). `mail` composes the emails and delivers them through a transport (log or Resend).
 
 ## Commands
 | | |
@@ -19,7 +19,7 @@ Flow: `rest` (HTTP) → `service` (rules, depends only on interfaces in `service
 | `make secrets-decrypt` / `secrets-encrypt` | edit `<env>.env` (gitignored), re-encrypt to `<env>.enc.env` |
 
 ## Config (env)
-`DATABASE_URL`, `JWT_SECRET` (at least 32 bytes) are required; `PORT` (default 8080) and `REFRESH_GRACE_SECONDS` (default 10; compose sets 0 so Bruno can assert reuse detection) are optional. `cmd/migrate` needs only `DATABASE_URL`.
+`DATABASE_URL`, `JWT_SECRET` (at least 32 bytes) are required; `PORT` (default 8080) and `REFRESH_GRACE_SECONDS` (default 10; compose sets 0 so Bruno can assert reuse detection) are optional. Email: `ENV` (`dev`|`prod`, default dev), `APP_BASE_URL` (default `http://localhost:3000`; the Web repo's pages that email links point to), `MAIL_PROVIDER` (`log`|`resend`, default `log`, which prints emails and is refused when `ENV=prod`), `MAIL_FROM` and `RESEND_API_KEY` (required for `resend`). `cmd/migrate` needs only `DATABASE_URL`.
 
 ## Dev database
 `docker-compose.db.yml` defines a standalone StreamNext Postgres 16 (user `streamnext`, db `streamnext_dev`, port **5433**, own volume), separate from WellSpent's. Start it once on the DB host with `make db-up` (or copy `.env.db.example` to `.env.db`) and leave it running; every machine's `dev.enc.env` points `DATABASE_URL` at that host. Recreate from scratch: `docker compose -f docker-compose.db.yml --env-file .env.db down -v`, then `make db-up` and `make migrate`. On a Windows DB host you don't need sops: copy `.env.db` (from `make db-env` on the Mac), run the compose command from `docker-compose.db.yml`'s header, and open the port once with `scripts/open-db-firewall.ps1` (elevated PowerShell). Tests never use it: `make test` and `make bruno` start their own throwaway containers.

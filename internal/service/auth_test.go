@@ -41,10 +41,11 @@ func (e *env) register(t *testing.T, email string, dev uuid.UUID) Session {
 	return s
 }
 
-func requireKind(t *testing.T, err error, kind apperr.Kind) {
+// requireKind asserts err is an application error of the given kind; msg says what the case was about.
+func requireKind(t *testing.T, err error, kind apperr.Kind, msg ...string) {
 	t.Helper()
-	require.Error(t, err)
-	assert.Equal(t, kind, apperr.From(err).Kind, err.Error())
+	require.Error(t, err, msg)
+	assert.Equal(t, kind, apperr.From(err).Kind, "%v %v", err, msg)
 }
 
 // --- Register ------------------------------------------------------------------------------
@@ -289,6 +290,18 @@ func TestRefreshReuseRevokesEverySession(t *testing.T) {
 	}
 }
 
+func TestRefreshOfATokenRevokedByANewLoginIsRejectedWithoutSideEffects(t *testing.T) {
+	e := newEnv(10 * time.Second)
+	old := e.register(t, "a@b.co", device)
+	fresh, err := e.svc.Login(e.ctx, LoginInput{Email: "a@b.co", Password: "correct-horse", DeviceID: device})
+	require.NoError(t, err)
+
+	_, err = e.svc.Refresh(e.ctx, RefreshInput{RefreshToken: old.RefreshToken, DeviceID: device})
+	requireKind(t, err, apperr.Unauthenticated)
+	_, err = e.svc.Refresh(e.ctx, RefreshInput{RefreshToken: fresh.RefreshToken, DeviceID: device})
+	assert.NoError(t, err, "the new login's session is still good")
+}
+
 func TestRefreshGraceWindowRecoversALostResponse(t *testing.T) {
 	e := newEnv(10 * time.Second)
 	s := e.register(t, "a@b.co", device)
@@ -407,14 +420,18 @@ func TestRefreshRevokedPathInfrastructureErrors(t *testing.T) {
 func TestLogoutRevokesAndIsIdempotent(t *testing.T) {
 	e := newEnv(10 * time.Second)
 	s := e.register(t, "a@b.co", device)
+	other, err := e.svc.Login(e.ctx, LoginInput{Email: "a@b.co", Password: "correct-horse", DeviceID: otherDevice})
+	require.NoError(t, err)
 
 	require.NoError(t, e.svc.Logout(e.ctx, s.RefreshToken))
-	assert.Empty(t, e.tokens.live(s.User.ID))
 	require.NoError(t, e.svc.Logout(e.ctx, s.RefreshToken), "second logout is fine")
 	require.NoError(t, e.svc.Logout(e.ctx, "never-issued"), "unknown token is fine")
 
-	_, err := e.svc.Refresh(e.ctx, RefreshInput{RefreshToken: s.RefreshToken, DeviceID: device})
+	_, err = e.svc.Refresh(e.ctx, RefreshInput{RefreshToken: s.RefreshToken, DeviceID: device})
 	requireKind(t, err, apperr.Unauthenticated)
+	live := e.tokens.live(s.User.ID)
+	require.Len(t, live, 1, "a stale token presented after logout does not sign out the user's other sessions")
+	assert.Equal(t, auth.HashToken(other.RefreshToken), live[0].TokenHash)
 }
 
 func TestLogoutInfrastructureErrors(t *testing.T) {

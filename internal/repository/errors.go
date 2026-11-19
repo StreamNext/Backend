@@ -19,6 +19,17 @@ func notFound(err error) error {
 	return err
 }
 
+// affected turns "no row matched" into ErrNotFound, for UPDATE and DELETE statements that return a row count.
+func affected(rows int64, err error) error {
+	if err != nil {
+		return err
+	}
+	if rows == 0 {
+		return service.ErrNotFound
+	}
+	return nil
+}
+
 func isUniqueViolation(err error, constraint string) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == constraint

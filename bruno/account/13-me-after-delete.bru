@@ -1,0 +1,20 @@
+meta {
+  name: The old access token no longer gets a profile
+  type: http
+  seq: 13
+}
+
+get {
+  url: {{baseUrl}}/v1/me
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+assert {
+  res.status: eq 401
+  res.body.code: eq unauthenticated
+}

@@ -11,6 +11,16 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type EmailToken struct {
+	ID         uuid.UUID
+	UserID     uuid.UUID
+	Purpose    string
+	TokenHash  string
+	ExpiresAt  time.Time
+	CreatedAt  time.Time
+	ConsumedAt *time.Time
+}
+
 type RefreshToken struct {
 	ID              uuid.UUID
 	UserID          uuid.UUID

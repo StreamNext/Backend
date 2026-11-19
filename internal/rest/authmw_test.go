@@ -16,7 +16,9 @@ func TestSecuredRoutesComeFromTheContract(t *testing.T) {
 	require.NoError(t, err)
 	// Pins exactly which operations the contract protects: a new public route, or an
 	// accidentally unprotected one, shows up as a diff here.
-	assert.Equal(t, map[string]bool{"GET /v1/me": true, "PATCH /v1/me": true}, secured)
+	assert.Equal(t, map[string]bool{
+		"GET /v1/me": true, "PATCH /v1/me": true, "DELETE /v1/me": true, "POST /v1/me/change-password": true,
+	}, secured)
 }
 
 func TestSecuredRoutesRejectMissingOrBadCredentials(t *testing.T) {
@@ -30,12 +32,19 @@ func TestSecuredRoutesRejectMissingOrBadCredentials(t *testing.T) {
 		"lowercase prefix": {"Authorization": "bearer good-token"},
 	} {
 		t.Run(name, func(t *testing.T) {
-			for _, call := range []struct{ method, body string }{{http.MethodGet, ""}, {http.MethodPatch, `{"displayName":"x"}`}} {
-				requireError(t, send(t, h.handler, call.method, "/v1/me", call.body, headers), http.StatusUnauthorized, "unauthenticated")
+			for _, call := range []struct{ method, path, body string }{
+				{http.MethodGet, "/v1/me", ""},
+				{http.MethodPatch, "/v1/me", `{"displayName":"x"}`},
+				{http.MethodDelete, "/v1/me", ""},
+				{http.MethodPost, "/v1/me/change-password", `{}`},
+			} {
+				requireError(t, send(t, h.handler, call.method, call.path, call.body, headers), http.StatusUnauthorized, "unauthenticated")
 			}
 		})
 	}
-	assert.Zero(t, h.profile.gotID, "the handler never ran")
+	assert.Zero(t, h.profile.gotID, "the handlers never ran")
+	assert.Zero(t, h.account.deleteCalls)
+	assert.Zero(t, h.account.gotUser)
 }
 
 func TestHeadRequestToASecuredRouteIsAlsoChecked(t *testing.T) {
@@ -51,14 +60,19 @@ func TestUserIDIsZeroWithoutAuthentication(t *testing.T) {
 // either they are rejected, or the router redirects them to the canonical (checked) path without
 // ever running the handler.
 func TestSecuredRouteCannotBeReachedWithoutAToken(t *testing.T) {
-	for _, path := range []string{
-		"/v1/me", "/v1/me?x=1", "/v1/me#frag", "//v1/me", "/v1//me", "/v1/./me", "/v1/x/../me", "/v1/me/", "/v1/ME", "/V1/me", "/v1/me%2F", "/v1/%6De",
-	} {
-		for _, method := range []string{http.MethodGet, http.MethodPatch, http.MethodHead} {
-			h := newHarness(t)
-			rec := send(t, h.handler, method, path, `{"displayName":"x"}`, nil)
-			assert.NotEqual(t, http.StatusOK, rec.Code, "%s %s", method, path)
-			assert.Zero(t, h.profile.gotID, "the profile handler must not run: %s %s", method, path)
+	for _, base := range []string{"/v1/me", "/v1/me/change-password"} {
+		for _, path := range []string{
+			base, base + "?x=1", base + "#frag", "/" + base, "/v1//" + base[4:], "/v1/./" + base[4:], "/v1/x/../" + base[4:], base + "/", base + "%2F",
+			"/v1/ME" + base[len("/v1/me"):], "/V1/" + base[4:],
+		} {
+			for _, method := range []string{http.MethodGet, http.MethodPatch, http.MethodHead, http.MethodDelete, http.MethodPost} {
+				h := newHarness(t)
+				rec := send(t, h.handler, method, path, `{"displayName":"x"}`, nil)
+				assert.Less(t, 299, rec.Code, "%s %s must not succeed without a token", method, path)
+				assert.Zero(t, h.profile.gotID, "%s %s", method, path)
+				assert.Zero(t, h.account.deleteCalls, "%s %s", method, path)
+				assert.Zero(t, h.account.gotUser, "%s %s", method, path)
+			}
 		}
 	}
 }

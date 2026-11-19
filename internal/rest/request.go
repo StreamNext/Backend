@@ -19,6 +19,14 @@ func (s *Server) decode(w http.ResponseWriter, r *http.Request, v any) bool {
 	return true
 }
 
+// decodeOptional is decode for a body the client may leave out entirely (an empty body counts as "{}").
+func (s *Server) decodeOptional(w http.ResponseWriter, r *http.Request, v any) bool {
+	if r.Body == nil || r.Body == http.NoBody || r.ContentLength == 0 {
+		return true
+	}
+	return s.decode(w, r, v)
+}
+
 // orZero reads an optional field from the generated models (pointers when not required).
 func orZero[T any](p *T) T {
 	var zero T

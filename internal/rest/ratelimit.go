@@ -23,13 +23,13 @@ type LimitRule struct {
 
 type Limits struct {
 	Global LimitRule // every request
-	Auth   LimitRule // additionally, requests under /v1/auth/ (brute-force protection)
+	Auth   LimitRule // additionally, the endpoints where passwords can be guessed or emails triggered (see isStrict)
 }
 
 func DefaultLimits() Limits {
 	return Limits{
-		Global: LimitRule{Rate: 10, Burst: 30},
-		Auth:   LimitRule{Rate: 0.5, Burst: 20}, // 30 attempts a minute, after an initial burst of 20
+		Global: LimitRule{Rate: 10, Burst: 60},
+		Auth:   LimitRule{Rate: 0.5, Burst: 30}, // 30 attempts a minute, after an initial burst of 30
 	}
 }
 
@@ -94,7 +94,7 @@ func (s *Server) rateLimit(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ip, now := clientIP(r), s.now()
 		limiters := []*ipLimiters{s.globalRate}
-		if strings.HasPrefix(r.URL.Path, "/v1/auth/") {
+		if isStrict(r) {
 			limiters = append(limiters, s.authRate)
 		}
 		for _, l := range limiters {
@@ -106,6 +106,14 @@ func (s *Server) rateLimit(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// isStrict marks the requests that get the stricter limit on top of the global one: everything under
+// /v1/auth/ (login, register, refresh, email flows) and the two signed-in endpoints that check the
+// current password, which a stolen access token could otherwise use to guess it.
+func isStrict(r *http.Request) bool {
+	p := r.URL.Path
+	return strings.HasPrefix(p, "/v1/auth/") || p == "/v1/me/change-password" || (p == "/v1/me" && r.Method == http.MethodDelete)
 }
 
 func clientIP(r *http.Request) string {

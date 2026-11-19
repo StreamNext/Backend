@@ -7,15 +7,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewRefreshToken(t *testing.T) {
-	raw, hash, err := NewRefreshToken()
+func TestNewToken(t *testing.T) {
+	raw, hash, err := NewToken()
 	require.NoError(t, err)
 	assert.Len(t, raw, 43, "32 bytes in unpadded base64url")
 	assert.Len(t, hash, 64, "SHA-256 in hex")
 	assert.Equal(t, hash, HashToken(raw))
 	assert.NotContains(t, hash, raw)
 
-	raw2, hash2, _ := NewRefreshToken()
+	raw2, hash2, _ := NewToken()
 	assert.NotEqual(t, raw, raw2)
 	assert.NotEqual(t, hash, hash2)
 }

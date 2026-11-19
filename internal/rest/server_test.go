@@ -68,6 +68,53 @@ func (p *stubProfile) Update(_ context.Context, id uuid.UUID, in service.UpdateP
 	return p.user, p.err
 }
 
+type stubVerification struct {
+	err                       error
+	resendEmail, confirmToken string
+}
+
+func (v *stubVerification) Resend(_ context.Context, email string) error {
+	v.resendEmail = email
+	return v.err
+}
+func (v *stubVerification) Confirm(_ context.Context, token string) error {
+	v.confirmToken = token
+	return v.err
+}
+
+type stubReset struct {
+	err                                     error
+	requestEmail, resetToken, resetPassword string
+}
+
+func (r *stubReset) Request(_ context.Context, email string) error {
+	r.requestEmail = email
+	return r.err
+}
+func (r *stubReset) Reset(_ context.Context, token, newPassword string) error {
+	r.resetToken, r.resetPassword = token, newPassword
+	return r.err
+}
+
+type stubAccount struct {
+	session        service.Session
+	err            error
+	gotUser        uuid.UUID
+	gotChange      service.ChangePasswordInput
+	deletePassword string
+	deleteCalls    int
+}
+
+func (a *stubAccount) ChangePassword(_ context.Context, id uuid.UUID, in service.ChangePasswordInput) (service.Session, error) {
+	a.gotUser, a.gotChange = id, in
+	return a.session, a.err
+}
+func (a *stubAccount) Delete(_ context.Context, id uuid.UUID, password string) error {
+	a.gotUser, a.deletePassword = id, password
+	a.deleteCalls++
+	return a.err
+}
+
 // stubTokens maps accepted bearer tokens to user ids.
 type stubTokens map[string]uuid.UUID
 
@@ -85,20 +132,26 @@ var (
 )
 
 type harness struct {
-	srv     *Server
-	handler http.Handler
-	auth    *stubAuth
-	profile *stubProfile
+	srv          *Server
+	handler      http.Handler
+	auth         *stubAuth
+	profile      *stubProfile
+	verification *stubVerification
+	reset        *stubReset
+	account      *stubAccount
 }
 
 // newHarness builds a Server with stub services. mutate may adjust Deps before construction.
 func newHarness(t *testing.T, mutate ...func(*Deps)) *harness {
 	t.Helper()
 	h := &harness{
-		auth:    &stubAuth{session: service.Session{AccessToken: "acc", RefreshToken: "ref", ExpiresIn: 900, User: fixture}},
-		profile: &stubProfile{user: fixture},
+		auth:         &stubAuth{session: service.Session{AccessToken: "acc", RefreshToken: "ref", ExpiresIn: 900, User: fixture}},
+		profile:      &stubProfile{user: fixture},
+		verification: &stubVerification{}, reset: &stubReset{},
+		account: &stubAccount{session: service.Session{AccessToken: "acc2", RefreshToken: "ref2", ExpiresIn: 900, User: fixture}},
 	}
-	d := Deps{DB: fakeDB{}, Auth: h.auth, Profile: h.profile, Tokens: stubTokens{"good-token": userA}, Log: zap.NewNop()}
+	d := Deps{DB: fakeDB{}, Auth: h.auth, Verification: h.verification, Reset: h.reset, Account: h.account, Profile: h.profile,
+		Tokens: stubTokens{"good-token": userA}, Log: zap.NewNop()}
 	for _, m := range mutate {
 		m(&d)
 	}

@@ -1,0 +1,23 @@
+meta {
+  name: Verify with a bad token
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/v1/auth/verify-email
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "token": "not-a-real-token"
+  }
+}
+
+assert {
+  res.status: eq 400
+  res.body.code: eq invalid_argument
+  res.body.message: eq invalid or expired token
+}

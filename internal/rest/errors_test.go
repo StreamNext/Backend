@@ -45,7 +45,7 @@ func TestWrongMethodIsJSON405WithAllow(t *testing.T) {
 	assert.Equal(t, "GET", rec.Header().Get("Allow"))
 	assert.JSONEq(t, `{"code":"method_not_allowed","message":"method not allowed"}`, rec.Body.String())
 
-	rec = do(t, newHarness(t).handler, http.MethodDelete, "/v1/me")
+	rec = do(t, newHarness(t).handler, http.MethodPut, "/v1/me")
 	assert.Equal(t, http.StatusMethodNotAllowed, rec.Code)
-	assert.Equal(t, "GET, PATCH", rec.Header().Get("Allow"))
+	assert.Equal(t, "GET, PATCH, DELETE", rec.Header().Get("Allow"))
 }

@@ -3,6 +3,17 @@
 Semver. Minor = new feature/endpoint, patch = fix, major = breaking contract change.
 The version is `internal/version/version.go`. Backend and Proto versions are independent; an entry says when it implements a new Proto version.
 
+## 0.3.0 — 2026-11-19
+Implements Proto 0.3.0 (auth email flows and account, M1 slice 2).
+- `POST /v1/auth/{verify-email,resend-verification,forgot-password,reset-password}`, `POST /v1/me/change-password`, `DELETE /v1/me`.
+- Register sends a verification email (a mail failure never blocks sign-up). Single-use email tokens, stored as SHA-256 hashes: 24h to verify, 1h to reset; a newer token supersedes older ones; one email per address per purpose per 60 seconds.
+- Resetting or changing the password revokes every session; change-password returns a new session for the requesting device.
+- **Behaviour change:** refresh-token reuse detection now applies only to tokens that were *rotated*. A token revoked by logout, a newer login or a password change/reset is just a 401 and no longer signs the user out everywhere (it would have undone a fresh login after a password reset).
+- `internal/mail`: log transport (dev only, refused when `ENV=prod`) and a Resend transport over plain `net/http`.
+- New config: `ENV`, `APP_BASE_URL`, `MAIL_PROVIDER`, `MAIL_FROM`, `RESEND_API_KEY` (all optional in dev).
+- Strict rate limit now also covers `POST /v1/me/change-password` and `DELETE /v1/me`; defaults are global 10/s burst 60, strict 0.5/s burst 30.
+- Migration `00003_email_token`. Bruno: 14 account-flow requests (suite: 34 requests, 78 assertions).
+
 ## 0.2.0 — 2026-11-19
 Implements Proto 0.2.0 (auth core, M1 slice 1).
 - `POST /v1/auth/{register,login,refresh,logout}` and `GET`/`PATCH /v1/me`.

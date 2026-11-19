@@ -16,3 +16,14 @@ SET display_name = COALESCE(sqlc.narg('display_name'), display_name),
     updated_at   = sqlc.arg('now')
 WHERE id = sqlc.arg('id')
 RETURNING *;
+
+-- name: SetUserPassword :execrows
+UPDATE users SET password_hash = sqlc.arg('password_hash')::text, updated_at = sqlc.arg('now')::timestamptz
+WHERE id = $1;
+
+-- name: MarkUserEmailVerified :execrows
+UPDATE users SET email_verified_at = COALESCE(email_verified_at, sqlc.arg('now')::timestamptz), updated_at = sqlc.arg('now')::timestamptz
+WHERE id = $1;
+
+-- name: DeleteUser :execrows
+DELETE FROM users WHERE id = $1;
