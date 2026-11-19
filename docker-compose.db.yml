@@ -1,0 +1,34 @@
+# Standalone StreamNext dev database, defined entirely here so it can be recreated from scratch on any
+# machine. Separate from WellSpent's Postgres: own compose project, volume and port (5433), so both can
+# run on the same host. Start it once on the DB host and leave it running; other machines point their
+# DATABASE_URL at that host.
+#
+#   make db-up          (writes .env.db from the encrypted dev secrets, then starts the container)
+# or, without sops on that machine:
+#   cp .env.db.example .env.db     # set the same password that is in dev.enc.env
+#   docker compose -f docker-compose.db.yml --env-file .env.db up -d --wait
+#
+# Clients: postgresql://streamnext:<password>@<host-lan-address>:5433/streamnext_dev?sslmode=disable
+# Binds all interfaces so the LAN can reach it; restrict at the router/firewall, not here.
+name: streamnext-db
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: streamnext
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.db}
+      POSTGRES_DB: streamnext_dev
+    ports:
+      - "5433:5432"
+    volumes:
+      - streamnext-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U streamnext -d streamnext_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  streamnext-db-data:

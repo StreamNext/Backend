@@ -3,6 +3,9 @@
 Semver. Minor = new feature/endpoint, patch = fix, major = breaking contract change.
 The version is `internal/version/version.go`. Backend and Proto versions are independent; an entry says when it implements a new Proto version.
 
+## 0.1.3 — 2026-11-19
+- Standalone dev database: `docker-compose.db.yml` (own project, volume and port 5433), `make db-env/db-up/db-down`, `.env.db.example`. `dev.enc.env` now holds `POSTGRES_PASSWORD` and the real dev `DATABASE_URL`.
+
 ## 0.1.2 — 2026-11-19
 - Makefile points sops at StreamNext's own age key automatically (`AGE_KEY_FILE`), so `make secrets-*`, `run` and `migrate` work in a fresh shell.
 - `secrets-decrypt`/`encrypt` write with `--output`, so a failed run can no longer truncate an existing `dev.env`.

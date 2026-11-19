@@ -11,8 +11,12 @@ Go REST + JWT API for StreamNext. Read `../CLAUDE.md` and `../docs/specs/02-arch
 | `make generate` | oapi-codegen from `../Proto` into `gen/api` (run after any contract change and on a fresh clone) |
 | `make test` | vet + unit + testcontainers tests (needs Docker) + **90% coverage gate** on `internal/` |
 | `make bruno` | Postgres + migrate + API in Docker, then `bru run --env ci` |
-| `make run` / `make migrate` | run against `ENV=dev` secrets (sops) |
+| `make db-up` / `db-down` | start/stop the standalone dev database (run on the DB host) |
+| `make run` / `make migrate` | run against `ENV=dev` secrets (sops); needs the dev database up |
 | `make secrets-decrypt` / `secrets-encrypt` | edit `<env>.env` (gitignored), re-encrypt to `<env>.enc.env` |
+
+## Dev database
+`docker-compose.db.yml` defines a standalone StreamNext Postgres 16 (user `streamnext`, db `streamnext_dev`, port **5433**, own volume), separate from WellSpent's. Start it once on the DB host with `make db-up` (or copy `.env.db.example` to `.env.db`) and leave it running; every machine's `dev.enc.env` points `DATABASE_URL` at that host. Recreate from scratch: `docker compose -f docker-compose.db.yml --env-file .env.db down -v`, then `make db-up` and `make migrate`. Tests never use it: `make test` and `make bruno` start their own throwaway containers.
 
 ## Secrets (sops + age)
 Encrypted files are `dev.enc.env` / `prod.enc.env` (the `.env` suffix is needed for sops to detect the format). The StreamNext age key is `~/Library/Application Support/sops/age/streamnext.txt` — **not** WellSpent's `keys.txt`. The Makefile points sops at it automatically (override with `AGE_KEY_FILE=...`). When you run `sops` directly, export `SOPS_AGE_KEY_FILE` to that path first, otherwise sops tries WellSpent's `keys.txt` and fails with "no master key was able to decrypt". CI uses the `SOPS_AGE_KEY` secret.

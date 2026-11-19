@@ -37,3 +37,4 @@ gen/
 # plaintext secrets (the encrypted <env>.enc.env copies are committed)
 dev.env
 prod.env
+.env.db

@@ -10,7 +10,7 @@ ifeq ($(shell test -f "$(AGE_KEY_FILE)" && echo yes),yes)
 export SOPS_AGE_KEY_FILE := $(AGE_KEY_FILE)
 endif
 
-.PHONY: generate run migrate test bruno secrets-encrypt secrets-decrypt
+.PHONY: generate run migrate test bruno db-env db-up db-down secrets-encrypt secrets-decrypt
 
 generate:
 	go tool oapi-codegen -config oapi-codegen.yaml $(SPEC)
@@ -32,6 +32,16 @@ bruno: generate
 	docker compose up -d --build
 	until curl -fs localhost:8080/v1/health >/dev/null; do sleep 1; done
 	cd bruno && $(BRU) run --env ci; s=$$?; cd .. && docker compose down -v; exit $$s
+
+# Standalone dev database (docker-compose.db.yml). Run on the DB host; see that file's header.
+db-env:
+	sops exec-env $(ENV).enc.env 'printf "POSTGRES_PASSWORD=%s\n" "$$POSTGRES_PASSWORD" > .env.db'
+
+db-up: db-env
+	docker compose -f docker-compose.db.yml --env-file .env.db up -d --wait
+
+db-down:
+	docker compose -f docker-compose.db.yml --env-file .env.db down
 
 secrets-decrypt:
 	sops decrypt --output $(ENV).env $(ENV).enc.env
